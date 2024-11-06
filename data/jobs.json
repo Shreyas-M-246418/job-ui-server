@@ -14,5 +14,13 @@
     "location": "Bangalore",
     "salary": "$20000-$30000",
     "createdAt": "2024-11-06T09:40:45.593Z"
+  },
+  {
+    "id": 3,
+    "title": "Sales Executive",
+    "description": "Sell various products of the company and maximize profit ",
+    "location": "Delhi",
+    "salary": "$10000-$15000",
+    "createdAt": "2024-11-06T11:01:04.893Z"
   }
 ]
