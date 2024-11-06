@@ -22,5 +22,13 @@
     "location": "Delhi",
     "salary": "$10000-$15000",
     "createdAt": "2024-11-06T11:01:04.893Z"
+  },
+  {
+    "id": 4,
+    "title": "QA analyst",
+    "description": "a professional who ensures that products, services, and processes meet quality standards and customer expectations.",
+    "location": "Hydrabad",
+    "salary": "$10000",
+    "createdAt": "2024-11-06T11:11:38.342Z"
   }
 ]
