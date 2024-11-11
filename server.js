@@ -1,3 +1,4 @@
+/*
 const express = require('express');
 const cors = require('cors');
 const fs = require('fs').promises;
@@ -139,3 +140,180 @@ app.get('/health', (req, res) => {
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
+*/
+
+const express = require('express');
+const cors = require('cors');
+const fs = require('fs').promises;
+const path = require('path');
+const passport = require('passport');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const GitHubStrategy = require('passport-github2').Strategy;
+const jwt = require('jsonwebtoken');
+const session = require('express-session');
+require('dotenv').config();
+
+const app = express();
+const port = process.env.PORT || 3001;
+
+// Middleware
+app.use(cors({
+  origin: 'https://job-ui-six.vercel.app',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+app.use(express.json());
+
+// Session and Passport setup
+app.use(session({
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false
+}));
+app.use(passport.initialize());
+app.use(passport.session());
+
+passport.serializeUser((user, done) => {
+  done(null, user);
+});
+
+passport.deserializeUser((user, done) => {
+  done(null, user);
+});
+
+// Google Strategy
+passport.use(new GoogleStrategy({
+    clientID: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackURL: "/auth/google/callback"
+  },
+  async (accessToken, refreshToken, profile, done) => {
+    try {
+      const user = {
+        id: profile.id,
+        email: profile.emails[0].value,
+        name: profile.displayName
+      };
+      return done(null, user);
+    } catch (error) {
+      return done(error, null);
+    }
+  }
+));
+
+// GitHub Strategy
+passport.use(new GitHubStrategy({
+    clientID: process.env.GITHUB_CLIENT_ID,
+    clientSecret: process.env.GITHUB_CLIENT_SECRET,
+    callbackURL: "/auth/github/callback"
+  },
+  async (accessToken, refreshToken, profile, done) => {
+    try {
+      const user = {
+        id: profile.id,
+        username: profile.username,
+        name: profile.displayName
+      };
+      return done(null, user);
+    } catch (error) {
+      return done(error, null);
+    }
+  }
+));
+
+// Auth routes
+app.post('/auth/google', async (req, res) => {
+  try {
+    const { token } = req.body;
+    const ticket = await client.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID
+    });
+    const payload = ticket.getPayload();
+    const jwtToken = jwt.sign({ userId: payload.sub }, process.env.JWT_SECRET);
+    res.json({ token: jwtToken, user: payload });
+  } catch (error) {
+    res.status(401).json({ error: 'Authentication failed' });
+  }
+});
+
+app.get('/auth/github/callback',
+  passport.authenticate('github', { failureRedirect: '/login' }),
+  (req, res) => {
+    const token = jwt.sign({ userId: req.user.id }, process.env.JWT_SECRET);
+    res.redirect(`${process.env.CLIENT_URL}?token=${token}`);
+  }
+);
+
+// Middleware to protect routes
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) return res.sendStatus(401);
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) return res.sendStatus(403);
+    req.user = user;
+    next();
+  });
+};
+
+// API routes
+app.get('/api/jobs', authenticateToken, async (req, res) => {
+  try {
+    const jobs = await readJobsFile();
+    res.json(jobs);
+  } catch (error) {
+    console.error('Error reading jobs:', error);
+    res.status(500).json({ error: 'Failed to fetch jobs' });
+  }
+});
+
+app.post('/api/jobs', authenticateToken, async (req, res) => {
+  try {
+    const { title, description, location, salary } = req.body;
+    console.log('Incoming job data:', { title, description, location, salary });
+
+    if (!title || !description) {
+      return res.status(400).json({ error: 'Title and description are required' });
+    }
+
+    const jobs = await readJobsFile();
+    const newJob = {
+      id: jobs.length > 0 ? Math.max(...jobs.map(job => job.id)) + 1 : 1,
+      title,
+      description,
+      location,
+      salary,
+      createdAt: new Date().toISOString()
+    };
+
+    jobs.push(newJob);
+
+    try {
+      await writeJobsFile(jobs);
+      console.log('New job created:', newJob);
+      res.status(201).json(newJob);
+    } catch (error) {
+      console.error('Error writing jobs file:', error);
+      res.status(500).json({ error: 'Failed to create job' });
+    }
+  } catch (error) {
+    console.error('Error creating job:', error);
+    res.status(500).json({ error: 'Failed to create job' });
+  }
+});
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+    res.json({ status: 'OK' });
+  });
+  
+  app.get('/auth/verify', authenticateToken, (req, res) => {
+    res.json({ user: req.user });
+  });
+  
+  app.listen(port, () => {
+    console.log(`Server running on port ${port}`);
+  });
