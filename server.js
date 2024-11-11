@@ -273,15 +273,16 @@ app.post('/auth/google', async (req, res) => {
 });
 
 app.get('/auth/github/callback',
-  passport.authenticate('github', { failureRedirect: '/login' }),
-  (req, res) => {
-    const token = jwt.sign(
-      { userId: req.user.id }, 
-      process.env.JWT_SECRET || 'your-secret-key'
-    );
-    res.redirect(`${process.env.CLIENT_URL}?token=${token}`);
-  }
-);
+    passport.authenticate('github', { failureRedirect: '/login' }),
+    (req, res) => {
+      const token = jwt.sign(
+        { userId: req.user.id }, 
+        process.env.JWT_SECRET || 'your-secret-key'
+      );
+      // Redirect to display-jobs page with token
+      res.redirect(`${process.env.CLIENT_URL}/display-jobs?token=${token}`);
+    }
+  );
 
 // Token verification endpoint
 app.get('/auth/verify', authenticateToken, (req, res) => {
