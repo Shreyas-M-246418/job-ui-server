@@ -25,6 +25,23 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
+app.get('/auth/github', (req, res) => {
+    const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${process.env.GITHUB_CLIENT_ID}&scope=user:email`;
+    res.json({ url: githubAuthUrl });
+  });
+  
+  app.get('/auth/github/callback',
+    passport.authenticate('github', { failureRedirect: '/login-signup' }),
+    (req, res) => {
+      const token = jwt.sign(
+        { userId: req.user.id },
+        process.env.JWT_SECRET || 'your-secret-key'
+      );
+      // Redirect to display-jobs page with token
+      res.redirect(`${process.env.CLIENT_URL}/display-jobs?token=${token}`);
+    }
+  );
+
 // Helper functions for reading/writing jobs
 const readJobsFile = async () => {
   try {
