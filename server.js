@@ -25,23 +25,6 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-app.get('/auth/github', (req, res) => {
-    const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${process.env.GITHUB_CLIENT_ID}&scope=user:email`;
-    res.json({ url: githubAuthUrl });
-  });
-  
-  app.get('/auth/github/callback',
-    passport.authenticate('github', { failureRedirect: '/login-signup' }),
-    (req, res) => {
-      const token = jwt.sign(
-        { userId: req.user.id },
-        process.env.JWT_SECRET || 'your-secret-key'
-      );
-      // Redirect to display-jobs page with token
-      res.redirect(`${process.env.CLIENT_URL}/display-jobs?token=${token}`);
-    }
-  );
-
 // Helper functions for reading/writing jobs
 const readJobsFile = async () => {
   try {
@@ -121,40 +104,22 @@ passport.use(new GitHubStrategy({
 ));
 
 // Auth routes
-app.post('/auth/google', async (req, res) => {
-  try {
-    const { token } = req.body;
-    // For demo purposes, we're creating a simple JWT
-    // In production, you should verify the Google token
-    const jwtToken = jwt.sign(
-      { userId: 'google-user' }, 
-      process.env.JWT_SECRET || 'your-secret-key'
-    );
-    res.json({ 
-      token: jwtToken, 
-      user: { 
-        id: 'google-user',
-        email: 'user@example.com',
-        name: 'Google User'
-      } 
-    });
-  } catch (error) {
-    console.error('Google auth error:', error);
-    res.status(401).json({ error: 'Authentication failed' });
-  }
+app.get('/auth/github', (req, res) => {
+  const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${process.env.GITHUB_CLIENT_ID}&scope=user:email`;
+  res.json({ url: githubAuthUrl });
 });
 
 app.get('/auth/github/callback',
-    passport.authenticate('github', { failureRedirect: '/login' }),
-    (req, res) => {
-      const token = jwt.sign(
-        { userId: req.user.id }, 
-        process.env.JWT_SECRET || 'your-secret-key'
-      );
-      // Redirect to display-jobs page with token
-      res.redirect(`${process.env.CLIENT_URL}/display-jobs?token=${token}`);
-    }
-  );
+  passport.authenticate('github', { failureRedirect: '/login-signup' }),
+  (req, res) => {
+    const token = jwt.sign(
+      { userId: req.user.id },
+      process.env.JWT_SECRET || 'your-secret-key'
+    );
+    // Redirect to display-jobs page with token
+    res.redirect(`${process.env.CLIENT_URL}/display-jobs?token=${token}`);
+  }
+);
 
 // Token verification endpoint
 app.get('/auth/verify', authenticateToken, (req, res) => {
