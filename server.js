@@ -245,6 +245,10 @@ app.get('/auth/github/callback',
   }
 );
 
+app.get('/auth/verify', authenticateToken, (req, res) => {
+    res.json({ user: req.user });
+  });
+
 // Middleware to protect routes
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -309,11 +313,7 @@ app.post('/api/jobs', authenticateToken, async (req, res) => {
 app.get('/health', (req, res) => {
     res.json({ status: 'OK' });
   });
-  
-  app.get('/auth/verify', authenticateToken, (req, res) => {
-    res.json({ user: req.user });
-  });
-  
+
   app.listen(port, () => {
     console.log(`Server running on port ${port}`);
   });
