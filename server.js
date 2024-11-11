@@ -141,29 +141,29 @@ app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
 */
+
+
 const express = require('express');
 const cors = require('cors');
 const fs = require('fs').promises;
 const path = require('path');
-const passport = require('passport');
-const GoogleStrategy = require('passport-google-oauth20').Strategy;
-const GitHubStrategy = require('passport-github2').Strategy;
 const jwt = require('jsonwebtoken');
+const passport = require('passport');
+const GitHubStrategy = require('passport-github2').Strategy;
 const session = require('express-session');
-const MongoStore = require('connect-mongo');
 require('dotenv').config();
 
 const app = express();
 const port = process.env.PORT || 3001;
 
-// Middleware for token authentication - defined before routes
+// Middleware for token authentication
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) return res.sendStatus(401);
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+  jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key', (err, user) => {
     if (err) return res.sendStatus(403);
     req.user = user;
     next();
@@ -188,6 +188,9 @@ const writeJobsFile = async (jobs) => {
   );
 };
 
+// Session storage using file system
+const FileStore = require('session-file-store')(session);
+
 // Middleware
 app.use(cors({
   origin: process.env.CLIENT_URL || 'https://job-ui-six.vercel.app',
@@ -198,16 +201,14 @@ app.use(cors({
 
 app.use(express.json());
 
-// Session configuration with MongoStore
+// Session configuration with FileStore
 app.use(session({
-  secret: process.env.SESSION_SECRET,
+  store: new FileStore({
+    path: './sessions'
+  }),
+  secret: process.env.SESSION_SECRET || 'your-secret-key',
   resave: false,
   saveUninitialized: false,
-  store: MongoStore.create({
-    mongoUrl: process.env.MONGODB_URI,
-    collectionName: 'sessions',
-    ttl: 24 * 60 * 60 // 1 day
-  }),
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
@@ -226,26 +227,6 @@ passport.serializeUser((user, done) => {
 passport.deserializeUser((user, done) => {
   done(null, user);
 });
-
-// Google Strategy
-passport.use(new GoogleStrategy({
-    clientID: process.env.GOOGLE_CLIENT_ID,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: "/auth/google/callback"
-  },
-  async (accessToken, refreshToken, profile, done) => {
-    try {
-      const user = {
-        id: profile.id,
-        email: profile.emails[0].value,
-        name: profile.displayName
-      };
-      return done(null, user);
-    } catch (error) {
-      return done(error, null);
-    }
-  }
-));
 
 // GitHub Strategy
 passport.use(new GitHubStrategy({
@@ -271,10 +252,20 @@ passport.use(new GitHubStrategy({
 app.post('/auth/google', async (req, res) => {
   try {
     const { token } = req.body;
-    // You'll need to implement the Google token verification here
-    // using the google-auth-library
-    const jwtToken = jwt.sign({ userId: 'temp-user-id' }, process.env.JWT_SECRET);
-    res.json({ token: jwtToken, user: { id: 'temp-user-id' } });
+    // For demo purposes, we're creating a simple JWT
+    // In production, you should verify the Google token
+    const jwtToken = jwt.sign(
+      { userId: 'google-user' }, 
+      process.env.JWT_SECRET || 'your-secret-key'
+    );
+    res.json({ 
+      token: jwtToken, 
+      user: { 
+        id: 'google-user',
+        email: 'user@example.com',
+        name: 'Google User'
+      } 
+    });
   } catch (error) {
     console.error('Google auth error:', error);
     res.status(401).json({ error: 'Authentication failed' });
@@ -284,7 +275,10 @@ app.post('/auth/google', async (req, res) => {
 app.get('/auth/github/callback',
   passport.authenticate('github', { failureRedirect: '/login' }),
   (req, res) => {
-    const token = jwt.sign({ userId: req.user.id }, process.env.JWT_SECRET);
+    const token = jwt.sign(
+      { userId: req.user.id }, 
+      process.env.JWT_SECRET || 'your-secret-key'
+    );
     res.redirect(`${process.env.CLIENT_URL}?token=${token}`);
   }
 );
@@ -305,11 +299,10 @@ app.get('/api/jobs', async (req, res) => {
   }
 });
 
-app.post('/api/jobs', authenticateToken, async (req, res) => {
+app.post('/api/jobs', async (req, res) => {
   try {
     const { title, description, location, salary } = req.body;
-    console.log('Incoming job data:', { title, description, location, salary });
-
+    
     if (!title || !description) {
       return res.status(400).json({ error: 'Title and description are required' });
     }
@@ -338,6 +331,20 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK' });
 });
 
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-});
+// Create data directory if it doesn't exist
+const ensureDataDirectory = async () => {
+  const dataDir = path.join(__dirname, 'data');
+  try {
+    await fs.access(dataDir);
+  } catch {
+    await fs.mkdir(dataDir);
+    await writeJobsFile([]);
+  }
+};
+
+// Initialize server
+ensureDataDirectory().then(() => {
+  app.listen(port, () => {
+    console.log(`Server running on port ${port}`);
+  });
+}).catch(console.error);
