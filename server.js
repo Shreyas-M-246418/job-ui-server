@@ -12,17 +12,24 @@ const port = process.env.PORT || 3001;
 
 // Middleware for token authentication
 const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) return res.sendStatus(401);
-
-  jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key', (err, user) => {
-    if (err) return res.sendStatus(403);
-    req.user = user;
-    next();
-  });
-};
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+  
+    if (!token) {
+      console.log('No token provided');
+      return res.sendStatus(401);
+    }
+  
+    jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key', (err, user) => {
+      if (err) {
+        console.log('Error verifying token:', err);
+        return res.sendStatus(403);
+      }
+      req.user = user;
+      console.log('Token verified, user:', user);
+      next();
+    });
+  };
 
 // Helper functions for reading/writing jobs
 const readJobsFile = async () => {
@@ -80,7 +87,7 @@ app.get('/auth/github', (req, res) => {
 app.get('/auth/verify', authenticateToken, (req, res) => {
     res.json({ user: req.user });
   });
-  
+
 // New GitHub callback endpoint
 app.post('/auth/github/callback', async (req, res) => {
   try {
@@ -153,33 +160,38 @@ app.get('/api/jobs', async (req, res) => {
 });
 
 app.post('/api/jobs', authenticateToken, async (req, res) => {
-  try {
-    const { title, description, location, salary, userId, createdBy } = req.body;
-    
-    if (!title || !description) {
-      return res.status(400).json({ error: 'Title and description are required' });
+    try {
+      const { title, description, location, salary, userId, createdBy } = req.body;
+      
+      if (!title || !description) {
+        return res.status(400).json({ error: 'Title and description are required' });
+      }
+  
+      // Check if the user is authorized to create a new job
+      if (req.user.userId !== userId) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+  
+      const jobs = await readJobsFile();
+      const newJob = {
+        id: jobs.length > 0 ? Math.max(...jobs.map(job => job.id)) + 1 : 1,
+        title,
+        description,
+        location,
+        salary,
+        userId,
+        createdBy,
+        createdAt: new Date().toISOString()
+      };
+  
+      jobs.push(newJob);
+      await writeJobsFile(jobs);
+      res.status(201).json(newJob);
+    } catch (error) {
+      console.error('Error creating job:', error);
+      res.status(500).json({ error: 'Failed to create job' });
     }
-
-    const jobs = await readJobsFile();
-    const newJob = {
-      id: jobs.length > 0 ? Math.max(...jobs.map(job => job.id)) + 1 : 1,
-      title,
-      description,
-      location,
-      salary,
-      userId,
-      createdBy,
-      createdAt: new Date().toISOString()
-    };
-
-    jobs.push(newJob);
-    await writeJobsFile(jobs);
-    res.status(201).json(newJob);
-  } catch (error) {
-    console.error('Error creating job:', error);
-    res.status(500).json({ error: 'Failed to create job' });
-  }
-});
+  });
 
 // Health check endpoint
 app.get('/health', (req, res) => {
