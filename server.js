@@ -105,6 +105,9 @@ app.post('/auth/github/callback', async (req, res) => {
     res.json({ user, token });
   } catch (error) {
     console.error('GitHub callback error:', error);
+    if (error.response) {
+      console.error('GitHub API response:', error.response.data);
+    }
     res.status(500).json({ error: 'Authentication failed' });
   }
 });
