@@ -1,14 +1,29 @@
+
 const express = require('express');
 const cors = require('cors');
 const fs = require('fs').promises;
 const path = require('path');
 const jwt = require('jsonwebtoken');
-const axios = require('axios');
+const axios = require('axios'); // Make sure to install axios
 const session = require('express-session');
 require('dotenv').config();
 
 const app = express();
 const port = process.env.PORT || 3001;
+
+// Middleware for token authentication
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) return res.sendStatus(401);
+
+  jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key', (err, user) => {
+    if (err) return res.sendStatus(403);
+    req.user = user;
+    next();
+  });
+};
 
 // Helper functions for reading/writing jobs
 const readJobsFile = async () => {
@@ -62,6 +77,7 @@ app.get('/auth/github', (req, res) => {
   res.json({ url: githubAuthUrl });
 });
 
+// New GitHub callback endpoint
 app.post('/auth/github/callback', async (req, res) => {
   try {
     const { code } = req.body;
@@ -105,11 +121,13 @@ app.post('/auth/github/callback', async (req, res) => {
     res.json({ user, token });
   } catch (error) {
     console.error('GitHub callback error:', error);
-    if (error.response) {
-      console.error('GitHub API response:', error.response.data);
-    }
     res.status(500).json({ error: 'Authentication failed' });
   }
+});
+
+// Token verification endpoint
+app.get('/auth/verify', authenticateToken, (req, res) => {
+  res.json({ user: req.user });
 });
 
 // API routes
@@ -130,7 +148,7 @@ app.get('/api/jobs', async (req, res) => {
   }
 });
 
-app.post('/api/jobs', async (req, res) => {
+app.post('/api/jobs', authenticateToken, async (req, res) => {
   try {
     const { title, description, location, salary, userId, createdBy } = req.body;
     
@@ -181,4 +199,3 @@ ensureDataDirectory().then(() => {
     console.log(`Server running on port ${port}`);
   });
 }).catch(console.error);
-
