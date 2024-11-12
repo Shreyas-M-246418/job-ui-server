@@ -3,8 +3,7 @@ const cors = require('cors');
 const fs = require('fs').promises;
 const path = require('path');
 const jwt = require('jsonwebtoken');
-const passport = require('passport');
-const GitHubStrategy = require('passport-github2').Strategy;
+const axios = require('axios'); // Make sure to install axios
 const session = require('express-session');
 require('dotenv').config();
 
@@ -71,55 +70,59 @@ app.use(session({
   }
 }));
 
-// Passport initialization
-app.use(passport.initialize());
-app.use(passport.session());
-
-passport.serializeUser((user, done) => {
-  done(null, user);
-});
-
-passport.deserializeUser((user, done) => {
-  done(null, user);
-});
-
-// GitHub Strategy
-passport.use(new GitHubStrategy({
-    clientID: process.env.GITHUB_CLIENT_ID,
-    clientSecret: process.env.GITHUB_CLIENT_SECRET,
-    callbackURL: "/auth/github/callback"
-  },
-  async (accessToken, refreshToken, profile, done) => {
-    try {
-      const user = {
-        id: profile.id,
-        username: profile.username,
-        name: profile.displayName
-      };
-      return done(null, user);
-    } catch (error) {
-      return done(error, null);
-    }
-  }
-));
-
 // Auth routes
 app.get('/auth/github', (req, res) => {
-  const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${process.env.GITHUB_CLIENT_ID}&scope=user:email`;
+  const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${process.env.GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.GITHUB_CALLBACK_URL)}`;
   res.json({ url: githubAuthUrl });
 });
 
-app.get('/auth/github/callback',
-  passport.authenticate('github', { failureRedirect: '/login-signup' }),
-  (req, res) => {
+// New GitHub callback endpoint
+app.post('/auth/github/callback', async (req, res) => {
+  try {
+    const { code } = req.body;
+    
+    // Exchange code for access token
+    const tokenResponse = await axios.post('https://github.com/login/oauth/access_token', {
+      client_id: process.env.GITHUB_CLIENT_ID,
+      client_secret: process.env.GITHUB_CLIENT_SECRET,
+      code: code,
+      redirect_uri: process.env.GITHUB_CALLBACK_URL
+    }, {
+      headers: {
+        Accept: 'application/json'
+      }
+    });
+
+    const accessToken = tokenResponse.data.access_token;
+
+    // Get user data from GitHub
+    const userResponse = await axios.get('https://api.github.com/user', {
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
+    });
+
+    const user = {
+      id: userResponse.data.id,
+      username: userResponse.data.login,
+      name: userResponse.data.name || userResponse.data.login,
+      email: userResponse.data.email
+    };
+
+    // Create JWT token
     const token = jwt.sign(
-      { userId: req.user.id },
-      process.env.JWT_SECRET || 'your-secret-key'
+      { userId: user.id, username: user.username },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '24h' }
     );
-    // Redirect to display-jobs page with token
-    res.redirect(`${process.env.CLIENT_URL}/display-jobs?token=${token}`);
+
+    // Send user data and token back to client
+    res.json({ user, token });
+  } catch (error) {
+    console.error('GitHub callback error:', error);
+    res.status(500).json({ error: 'Authentication failed' });
   }
-);
+});
 
 // Token verification endpoint
 app.get('/auth/verify', authenticateToken, (req, res) => {
@@ -130,14 +133,21 @@ app.get('/auth/verify', authenticateToken, (req, res) => {
 app.get('/api/jobs', async (req, res) => {
   try {
     const jobs = await readJobsFile();
-    res.json(jobs);
+    const userId = req.query.userId;
+
+    if (userId) {
+      const userJobs = jobs.filter(job => job.userId === userId);
+      res.json(userJobs);
+    } else {
+      res.json(jobs);
+    }
   } catch (error) {
     console.error('Error reading jobs:', error);
     res.status(500).json({ error: 'Failed to fetch jobs' });
   }
 });
 
-app.post('/api/jobs', async (req, res) => {
+app.post('/api/jobs', authenticateToken, async (req, res) => {
   try {
     const { title, description, location, salary, userId, createdBy } = req.body;
     
