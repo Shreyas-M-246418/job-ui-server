@@ -76,6 +76,11 @@ app.get('/auth/github', (req, res) => {
   res.json({ url: githubAuthUrl });
 });
 
+// In your server.js file
+app.get('/auth/verify', authenticateToken, (req, res) => {
+    res.json({ user: req.user });
+  });
+  
 // New GitHub callback endpoint
 app.post('/auth/github/callback', async (req, res) => {
   try {
