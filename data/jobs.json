@@ -72,5 +72,13 @@
     "location": "Kolkata",
     "salary": "$12000-$14000",
     "createdAt": "2024-11-13T10:56:25.057Z"
+  },
+  {
+    "id": 10,
+    "title": "Data Intern",
+    "description": "Work on data to find trend and patterns which assist in better market analysis",
+    "location": "Delhi",
+    "salary": "$6000-$9000",
+    "createdAt": "2024-11-13T12:02:11.511Z"
   }
 ]
