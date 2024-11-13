@@ -1,3 +1,4 @@
+/*
 const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
@@ -212,4 +213,109 @@ app.get('/health', (req, res) => {
 
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
+});
+*/
+
+const express = require('express');
+const cors = require('cors');
+const jwt = require('jsonwebtoken');
+const axios = require('axios');
+const session = require('express-session');
+require('dotenv').config();
+
+const app = express();
+const port = process.env.PORT || 3001;
+
+// Updated CORS configuration with explicit options
+app.use(cors({
+  origin: process.env.CLIENT_URL || 'https://job-ui-six.vercel.app',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  exposedHeaders: ['Set-Cookie']
+}));
+
+app.use(express.json());
+
+// Enhanced error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  res.status(500).json({ 
+    error: 'Internal Server Error',
+    message: process.env.NODE_ENV === 'development' ? err.message : undefined
+  });
+});
+
+// Updated GitHub callback route with better error handling
+app.post('/auth/github/callback', async (req, res) => {
+  try {
+    const { code } = req.body;
+    
+    if (!code) {
+      return res.status(400).json({ error: 'Authorization code is required' });
+    }
+
+    // Log the GitHub OAuth process
+    console.log('Initiating GitHub OAuth exchange');
+    console.log('Client ID:', process.env.GITHUB_CLIENT_ID);
+    console.log('Redirect URI:', process.env.GITHUB_CALLBACK_URL);
+
+    // Exchange code for access token
+    const tokenResponse = await axios.post('https://github.com/login/oauth/access_token', {
+      client_id: process.env.GITHUB_CLIENT_ID,
+      client_secret: process.env.GITHUB_CLIENT_SECRET,
+      code: code,
+      redirect_uri: process.env.GITHUB_CALLBACK_URL
+    }, {
+      headers: {
+        Accept: 'application/json'
+      }
+    });
+
+    if (!tokenResponse.data.access_token) {
+      console.error('GitHub token response:', tokenResponse.data);
+      return res.status(400).json({ error: 'Failed to obtain access token' });
+    }
+
+    const accessToken = tokenResponse.data.access_token;
+
+    // Fetch user data
+    const userResponse = await axios.get('https://api.github.com/user', {
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
+    });
+
+    const user = {
+      id: userResponse.data.id,
+      username: userResponse.data.login,
+      name: userResponse.data.name || userResponse.data.login,
+      email: userResponse.data.email
+    };
+
+    // Generate JWT
+    const token = jwt.sign(
+      { userId: user.id, username: user.username },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '24h' }
+    );
+
+    res.json({ user, token });
+  } catch (error) {
+    console.error('Detailed GitHub callback error:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      headers: error.response?.headers
+    });
+
+    if (error.response?.status === 401) {
+      return res.status(401).json({ error: 'GitHub authentication failed' });
+    }
+
+    res.status(500).json({ 
+      error: 'Authentication failed',
+      message: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
 });
