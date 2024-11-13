@@ -11,6 +11,37 @@ require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 3001;
 
+const updateGithubRepo = async (jobs) => {
+    try {
+      const content = await axios.get(`https://api.github.com/repos/${process.env.GITHUB_REPO_OWNER}/${process.env.GITHUB_REPO_NAME}/contents/data/jobs.json`, {
+        headers: {
+          Authorization: `token ${process.env.GITHUB_ACCESS_TOKEN}`,
+          Accept: 'application/vnd.github.v3+json'
+        }
+      });
+  
+      const updatedContent = Buffer.from(JSON.stringify(jobs, null, 2)).toString('base64');
+  
+      await axios.put(
+        `https://api.github.com/repos/${process.env.GITHUB_REPO_OWNER}/${process.env.GITHUB_REPO_NAME}/contents/data/jobs.json`,
+        {
+          message: 'Update jobs.json',
+          content: updatedContent,
+          sha: content.data.sha
+        },
+        {
+          headers: {
+            Authorization: `token ${process.env.GITHUB_ACCESS_TOKEN}`,
+            Accept: 'application/vnd.github.v3+json'
+          }
+        }
+      );
+    } catch (error) {
+      console.error('Error updating GitHub repository:', error);
+      // Don't throw the error - we still want to save locally even if GitHub update fails
+    }
+  };
+
 // Middleware for token authentication
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -169,7 +200,13 @@ app.post('/api/jobs', authenticateToken, async (req, res) => {
     };
 
     jobs.push(newJob);
+    
+    // Save locally first
     await writeJobsFile(jobs);
+    
+    // Then update GitHub repository
+    await updateGithubRepo(jobs);
+    
     res.status(201).json(newJob);
   } catch (error) {
     console.error('Error creating job:', error);
