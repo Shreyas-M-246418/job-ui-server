@@ -221,12 +221,13 @@ const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
 const session = require('express-session');
+const FileStore = require('session-file-store')(session);
 require('dotenv').config();
 
 const app = express();
 const port = process.env.PORT || 3001;
 
-// Updated CORS configuration with explicit options
+// CORS Configuration
 app.use(cors({
   origin: process.env.CLIENT_URL || 'https://job-ui-six.vercel.app',
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
@@ -237,7 +238,95 @@ app.use(cors({
 
 app.use(express.json());
 
-// Enhanced error handling middleware
+// Session Configuration
+app.use(session({
+  store: new FileStore({
+    path: './sessions'
+  }),
+  secret: process.env.SESSION_SECRET || 'your-secret-key',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
+
+// GitHub Jobs Data Management
+const readJobsFromGithub = async () => {
+  try {
+    const response = await axios.get(
+      `https://api.github.com/repos/${process.env.GITHUB_REPO_OWNER}/${process.env.GITHUB_REPO_NAME}/contents/data/jobs.json`,
+      {
+        headers: {
+          Authorization: `token ${process.env.GITHUB_ACCESS_TOKEN}`,
+          Accept: 'application/vnd.github.v3+json'
+        }
+      }
+    );
+    
+    const content = Buffer.from(response.data.content, 'base64').toString();
+    return JSON.parse(content);
+  } catch (error) {
+    console.error('Error reading from GitHub:', error);
+    return [];
+  }
+};
+
+const updateGithubJobs = async (jobs) => {
+  try {
+    const content = await axios.get(
+      `https://api.github.com/repos/${process.env.GITHUB_REPO_OWNER}/${process.env.GITHUB_REPO_NAME}/contents/data/jobs.json`,
+      {
+        headers: {
+          Authorization: `token ${process.env.GITHUB_ACCESS_TOKEN}`,
+          Accept: 'application/vnd.github.v3+json'
+        }
+      }
+    );
+
+    const updatedContent = Buffer.from(JSON.stringify(jobs, null, 2)).toString('base64');
+
+    await axios.put(
+      `https://api.github.com/repos/${process.env.GITHUB_REPO_OWNER}/${process.env.GITHUB_REPO_NAME}/contents/data/jobs.json`,
+      {
+        message: 'Update jobs.json',
+        content: updatedContent,
+        sha: content.data.sha
+      },
+      {
+        headers: {
+          Authorization: `token ${process.env.GITHUB_ACCESS_TOKEN}`,
+          Accept: 'application/vnd.github.v3+json'
+        }
+      }
+    );
+  } catch (error) {
+    console.error('Error updating GitHub repository:', error);
+    throw error;
+  }
+};
+
+// Authentication Middleware
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Authentication token required' });
+  }
+
+  jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key', (err, user) => {
+    if (err) {
+      return res.status(403).json({ error: 'Invalid or expired token' });
+    }
+    req.user = user;
+    next();
+  });
+};
+
+// Error Handling Middleware
 app.use((err, req, res, next) => {
   console.error('Error:', err);
   res.status(500).json({ 
@@ -246,7 +335,12 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Updated GitHub callback route with better error handling
+// Auth Routes
+app.get('/auth/github', (req, res) => {
+  const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${process.env.GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.GITHUB_CALLBACK_URL)}`;
+  res.json({ url: githubAuthUrl });
+});
+
 app.post('/auth/github/callback', async (req, res) => {
   try {
     const { code } = req.body;
@@ -255,22 +349,22 @@ app.post('/auth/github/callback', async (req, res) => {
       return res.status(400).json({ error: 'Authorization code is required' });
     }
 
-    // Log the GitHub OAuth process
-    console.log('Initiating GitHub OAuth exchange');
-    console.log('Client ID:', process.env.GITHUB_CLIENT_ID);
-    console.log('Redirect URI:', process.env.GITHUB_CALLBACK_URL);
+    console.log('Processing GitHub callback with code:', code);
 
-    // Exchange code for access token
-    const tokenResponse = await axios.post('https://github.com/login/oauth/access_token', {
-      client_id: process.env.GITHUB_CLIENT_ID,
-      client_secret: process.env.GITHUB_CLIENT_SECRET,
-      code: code,
-      redirect_uri: process.env.GITHUB_CALLBACK_URL
-    }, {
-      headers: {
-        Accept: 'application/json'
+    const tokenResponse = await axios.post(
+      'https://github.com/login/oauth/access_token',
+      {
+        client_id: process.env.GITHUB_CLIENT_ID,
+        client_secret: process.env.GITHUB_CLIENT_SECRET,
+        code: code,
+        redirect_uri: process.env.GITHUB_CALLBACK_URL
+      },
+      {
+        headers: {
+          Accept: 'application/json'
+        }
       }
-    });
+    );
 
     if (!tokenResponse.data.access_token) {
       console.error('GitHub token response:', tokenResponse.data);
@@ -279,7 +373,6 @@ app.post('/auth/github/callback', async (req, res) => {
 
     const accessToken = tokenResponse.data.access_token;
 
-    // Fetch user data
     const userResponse = await axios.get('https://api.github.com/user', {
       headers: {
         Authorization: `Bearer ${accessToken}`
@@ -293,7 +386,6 @@ app.post('/auth/github/callback', async (req, res) => {
       email: userResponse.data.email
     };
 
-    // Generate JWT
     const token = jwt.sign(
       { userId: user.id, username: user.username },
       process.env.JWT_SECRET || 'your-secret-key',
@@ -305,8 +397,7 @@ app.post('/auth/github/callback', async (req, res) => {
     console.error('Detailed GitHub callback error:', {
       message: error.message,
       response: error.response?.data,
-      status: error.response?.status,
-      headers: error.response?.headers
+      status: error.response?.status
     });
 
     if (error.response?.status === 401) {
@@ -320,3 +411,68 @@ app.post('/auth/github/callback', async (req, res) => {
   }
 });
 
+app.get('/auth/verify', authenticateToken, (req, res) => {
+  res.json({ user: req.user });
+});
+
+// Jobs API Routes
+app.get('/api/jobs', async (req, res) => {
+  try {
+    const jobs = await readJobsFromGithub();
+    const userId = req.query.userId;
+
+    if (userId) {
+      const userJobs = jobs.filter(job => job.userId === userId);
+      res.json(userJobs);
+    } else {
+      res.json(jobs);
+    }
+  } catch (error) {
+    console.error('Error reading jobs:', error);
+    res.status(500).json({ error: 'Failed to fetch jobs' });
+  }
+});
+
+app.post('/api/jobs', authenticateToken, async (req, res) => {
+  try {
+    const { title, description, location, salary, userId, createdBy } = req.body;
+    
+    if (!title || !description) {
+      return res.status(400).json({ error: 'Title and description are required' });
+    }
+
+    const jobs = await readJobsFromGithub();
+    const newJob = {
+      id: jobs.length > 0 ? Math.max(...jobs.map(job => job.id)) + 1 : 1,
+      title,
+      description,
+      location,
+      salary,
+      userId,
+      createdBy,
+      createdAt: new Date().toISOString()
+    };
+
+    jobs.push(newJob);
+    await updateGithubJobs(jobs);
+    
+    res.status(201).json(newJob);
+  } catch (error) {
+    console.error('Error creating job:', error);
+    res.status(500).json({ error: 'Failed to create job' });
+  }
+});
+
+// Health Check
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'OK',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Start Server
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
+  console.log(`Environment: ${process.env.NODE_ENV}`);
+});
