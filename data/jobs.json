@@ -64,5 +64,13 @@
     "userId": 105532060,
     "createdBy": "Sukrithi S",
     "createdAt": "2024-11-13T06:31:33.742Z"
+  },
+  {
+    "id": 9,
+    "title": "Software Intern",
+    "description": "Assist in SDLC of various projects, write quality code, perform unit testing and debug any issues",
+    "location": "Kolkata",
+    "salary": "$12000-$14000",
+    "createdAt": "2024-11-13T10:56:25.057Z"
   }
 ]
