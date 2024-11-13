@@ -1,46 +1,68 @@
-
 const express = require('express');
 const cors = require('cors');
-const fs = require('fs').promises;
-const path = require('path');
 const jwt = require('jsonwebtoken');
-const axios = require('axios'); // Make sure to install axios
+const axios = require('axios');
 const session = require('express-session');
 require('dotenv').config();
 
 const app = express();
 const port = process.env.PORT || 3001;
 
-const updateGithubRepo = async (jobs) => {
-    try {
-      const content = await axios.get(`https://api.github.com/repos/${process.env.GITHUB_REPO_OWNER}/${process.env.GITHUB_REPO_NAME}/contents/data/jobs.json`, {
+// Helper function to read jobs from GitHub
+const readJobsFromGithub = async () => {
+  try {
+    const response = await axios.get(
+      `https://api.github.com/repos/${process.env.GITHUB_REPO_OWNER}/${process.env.GITHUB_REPO_NAME}/contents/data/jobs.json`,
+      {
         headers: {
           Authorization: `token ${process.env.GITHUB_ACCESS_TOKEN}`,
           Accept: 'application/vnd.github.v3+json'
         }
-      });
-  
-      const updatedContent = Buffer.from(JSON.stringify(jobs, null, 2)).toString('base64');
-  
-      await axios.put(
-        `https://api.github.com/repos/${process.env.GITHUB_REPO_OWNER}/${process.env.GITHUB_REPO_NAME}/contents/data/jobs.json`,
-        {
-          message: 'Update jobs.json',
-          content: updatedContent,
-          sha: content.data.sha
-        },
-        {
-          headers: {
-            Authorization: `token ${process.env.GITHUB_ACCESS_TOKEN}`,
-            Accept: 'application/vnd.github.v3+json'
-          }
+      }
+    );
+    
+    const content = Buffer.from(response.data.content, 'base64').toString();
+    return JSON.parse(content);
+  } catch (error) {
+    console.error('Error reading from GitHub:', error);
+    return [];
+  }
+};
+
+// Helper function to update jobs in GitHub
+const updateGithubJobs = async (jobs) => {
+  try {
+    const content = await axios.get(
+      `https://api.github.com/repos/${process.env.GITHUB_REPO_OWNER}/${process.env.GITHUB_REPO_NAME}/contents/data/jobs.json`,
+      {
+        headers: {
+          Authorization: `token ${process.env.GITHUB_ACCESS_TOKEN}`,
+          Accept: 'application/vnd.github.v3+json'
         }
-      );
-    } catch (error) {
-      console.error('Error updating GitHub repository:', error);
-      // Don't throw the error - we still want to save locally even if GitHub update fails
-    }
-  };
+      }
+    );
+
+    const updatedContent = Buffer.from(JSON.stringify(jobs, null, 2)).toString('base64');
+
+    await axios.put(
+      `https://api.github.com/repos/${process.env.GITHUB_REPO_OWNER}/${process.env.GITHUB_REPO_NAME}/contents/data/jobs.json`,
+      {
+        message: 'Update jobs.json',
+        content: updatedContent,
+        sha: content.data.sha
+      },
+      {
+        headers: {
+          Authorization: `token ${process.env.GITHUB_ACCESS_TOKEN}`,
+          Accept: 'application/vnd.github.v3+json'
+        }
+      }
+    );
+  } catch (error) {
+    console.error('Error updating GitHub repository:', error);
+    throw error; // Propagate error since GitHub is our only storage
+  }
+};
 
 // Middleware for token authentication
 const authenticateToken = (req, res, next) => {
@@ -56,25 +78,6 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-// Helper functions for reading/writing jobs
-const readJobsFile = async () => {
-  try {
-    const data = await fs.readFile(path.join(__dirname, 'data', 'jobs.json'), 'utf8');
-    return JSON.parse(data);
-  } catch (error) {
-    return [];
-  }
-};
-
-const writeJobsFile = async (jobs) => {
-  await fs.writeFile(
-    path.join(__dirname, 'data', 'jobs.json'),
-    JSON.stringify(jobs, null, 2),
-    'utf8'
-  );
-};
-
-// Session storage using file system
 const FileStore = require('session-file-store')(session);
 
 // Middleware
@@ -87,7 +90,6 @@ app.use(cors({
 
 app.use(express.json());
 
-// Session configuration with FileStore
 app.use(session({
   store: new FileStore({
     path: './sessions'
@@ -98,7 +100,7 @@ app.use(session({
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    maxAge: 24 * 60 * 60 * 1000 // 1 day
+    maxAge: 24 * 60 * 60 * 1000
   }
 }));
 
@@ -108,12 +110,10 @@ app.get('/auth/github', (req, res) => {
   res.json({ url: githubAuthUrl });
 });
 
-// New GitHub callback endpoint
 app.post('/auth/github/callback', async (req, res) => {
   try {
     const { code } = req.body;
     
-    // Exchange code for access token
     const tokenResponse = await axios.post('https://github.com/login/oauth/access_token', {
       client_id: process.env.GITHUB_CLIENT_ID,
       client_secret: process.env.GITHUB_CLIENT_SECRET,
@@ -127,7 +127,6 @@ app.post('/auth/github/callback', async (req, res) => {
 
     const accessToken = tokenResponse.data.access_token;
 
-    // Get user data from GitHub
     const userResponse = await axios.get('https://api.github.com/user', {
       headers: {
         Authorization: `Bearer ${accessToken}`
@@ -141,14 +140,12 @@ app.post('/auth/github/callback', async (req, res) => {
       email: userResponse.data.email
     };
 
-    // Create JWT token
     const token = jwt.sign(
       { userId: user.id, username: user.username },
       process.env.JWT_SECRET || 'your-secret-key',
       { expiresIn: '24h' }
     );
 
-    // Send user data and token back to client
     res.json({ user, token });
   } catch (error) {
     console.error('GitHub callback error:', error);
@@ -156,7 +153,6 @@ app.post('/auth/github/callback', async (req, res) => {
   }
 });
 
-// Token verification endpoint
 app.get('/auth/verify', authenticateToken, (req, res) => {
   res.json({ user: req.user });
 });
@@ -164,7 +160,7 @@ app.get('/auth/verify', authenticateToken, (req, res) => {
 // API routes
 app.get('/api/jobs', async (req, res) => {
   try {
-    const jobs = await readJobsFile();
+    const jobs = await readJobsFromGithub();
     const userId = req.query.userId;
 
     if (userId) {
@@ -187,7 +183,7 @@ app.post('/api/jobs', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Title and description are required' });
     }
 
-    const jobs = await readJobsFile();
+    const jobs = await readJobsFromGithub();
     const newJob = {
       id: jobs.length > 0 ? Math.max(...jobs.map(job => job.id)) + 1 : 1,
       title,
@@ -200,12 +196,7 @@ app.post('/api/jobs', authenticateToken, async (req, res) => {
     };
 
     jobs.push(newJob);
-    
-    // Save locally first
-    await writeJobsFile(jobs);
-    
-    // Then update GitHub repository
-    await updateGithubRepo(jobs);
+    await updateGithubJobs(jobs);
     
     res.status(201).json(newJob);
   } catch (error) {
@@ -219,20 +210,6 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK' });
 });
 
-// Create data directory if it doesn't exist
-const ensureDataDirectory = async () => {
-  const dataDir = path.join(__dirname, 'data');
-  try {
-    await fs.access(dataDir);
-  } catch {
-    await fs.mkdir(dataDir);
-    await writeJobsFile([]);
-  }
-};
-
-// Initialize server
-ensureDataDirectory().then(() => {
-  app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
-  });
-}).catch(console.error);
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
+});
