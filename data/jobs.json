@@ -54,5 +54,15 @@
     "location": "Pune",
     "salary": "$6000-$9000",
     "createdAt": "2024-11-13T06:22:36.712Z"
+  },
+  {
+    "id": 8,
+    "title": "Project Manager",
+    "description": "Guide a project from start to finish, ensuring it's completed on time, within budget, and to the satisfaction of stakeholders",
+    "location": "Kochi",
+    "salary": "$20000-$30000",
+    "userId": 105532060,
+    "createdBy": "Sukrithi S",
+    "createdAt": "2024-11-13T06:31:33.742Z"
   }
 ]
