@@ -403,7 +403,6 @@ app.get('/api/jobs', async (req, res) => {
   }
 });
 
-
 app.post('/api/jobs', authenticateToken, async (req, res) => {
   try {
     const { title, description, location, salary, userId, createdBy } = req.body;
