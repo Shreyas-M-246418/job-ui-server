@@ -96,5 +96,15 @@
     "location": "NA",
     "salary": "NA",
     "createdAt": "2024-11-14T05:46:32.403Z"
+  },
+  {
+    "id": 13,
+    "title": "UX/UI Designer",
+    "description": "Create user-centered designs for digital products, such as websites, mobile apps, and software interfaces",
+    "location": "Mumbai",
+    "salary": "$20000",
+    "userId": 105532060,
+    "createdBy": "Sukrithi S",
+    "createdAt": "2024-11-14T05:53:13.619Z"
   }
 ]
