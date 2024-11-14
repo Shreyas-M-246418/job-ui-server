@@ -88,5 +88,13 @@
     "location": "Bengaluru",
     "salary": "Unpaid Internship",
     "createdAt": "2024-11-14T05:16:19.292Z"
+  },
+  {
+    "id": 12,
+    "title": "Test",
+    "description": "Testing",
+    "location": "NA",
+    "salary": "NA",
+    "createdAt": "2024-11-14T05:46:32.403Z"
   }
 ]
