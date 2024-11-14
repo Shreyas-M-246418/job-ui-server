@@ -164,7 +164,8 @@ app.get('/api/jobs', async (req, res) => {
     const userId = req.query.userId;
 
     if (userId) {
-      const userJobs = jobs.filter(job => job.userId === userId);
+      // Convert both IDs to strings for comparison
+      const userJobs = jobs.filter(job => String(job.userId) === String(userId));
       res.json(userJobs);
     } else {
       res.json(jobs);
