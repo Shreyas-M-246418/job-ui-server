@@ -214,5 +214,22 @@
     "userId": 25027415,
     "createdBy": "mister-rao",
     "createdAt": "2024-11-15T03:38:15.085Z"
+  },
+  {
+    "id": 25,
+    "title": "Testing",
+    "description": "testing",
+    "companyName": "company1",
+    "location": "location1",
+    "domain": "Full Stack",
+    "workType": "hybrid",
+    "employmentType": "internship",
+    "userType": "student",
+    "salaryRange": "NA",
+    "applyLink": "NA",
+    "userId": 148254896,
+    "createdBy": "Shreyas-M-246418",
+    "createdAt": "2024-11-24T09:54:48.816Z",
+    "updatedAt": "2024-11-24T09:54:48.816Z"
   }
 ]
