@@ -1,9 +1,9 @@
-
 const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
 const session = require('express-session');
+const FileStore = require('session-file-store')(session);
 require('dotenv').config();
 
 const app = express();
@@ -25,7 +25,7 @@ const readJobsFromGithub = async () => {
     const content = Buffer.from(response.data.content, 'base64').toString();
     return JSON.parse(content);
   } catch (error) {
-    console.error('Error reading from GitHub:', error);
+    console.error('Error reading from GitHub:', error); 
     return [];
   }
 };
@@ -33,7 +33,8 @@ const readJobsFromGithub = async () => {
 // Helper function to update jobs in GitHub
 const updateGithubJobs = async (jobs) => {
   try {
-    const content = await axios.get(
+    // Get the current file to obtain its SHA
+    const currentFile = await axios.get(
       `https://api.github.com/repos/${process.env.GITHUB_REPO_OWNER}/${process.env.GITHUB_REPO_NAME}/contents/data/jobs.json`,
       {
         headers: {
@@ -43,14 +44,16 @@ const updateGithubJobs = async (jobs) => {
       }
     );
 
+    // Convert the updated jobs array to a Base64 string
     const updatedContent = Buffer.from(JSON.stringify(jobs, null, 2)).toString('base64');
 
+    // Update the file in GitHub
     await axios.put(
       `https://api.github.com/repos/${process.env.GITHUB_REPO_OWNER}/${process.env.GITHUB_REPO_NAME}/contents/data/jobs.json`,
       {
-        message: 'Update jobs.json',
+        message: 'Update jobs.json via API',
         content: updatedContent,
-        sha: content.data.sha
+        sha: currentFile.data.sha
       },
       {
         headers: {
@@ -59,9 +62,11 @@ const updateGithubJobs = async (jobs) => {
         }
       }
     );
+
+    return true;
   } catch (error) {
     console.error('Error updating GitHub repository:', error);
-    throw error; // Propagate error since GitHub is our only storage
+    throw error;
   }
 };
 
@@ -78,8 +83,6 @@ const authenticateToken = (req, res, next) => {
     next();
   });
 };
-
-const FileStore = require('session-file-store')(session);
 
 // Middleware
 app.use(cors({
@@ -158,7 +161,7 @@ app.get('/auth/verify', authenticateToken, (req, res) => {
   res.json({ user: req.user });
 });
 
-// API routes
+// Jobs API routes
 app.get('/api/jobs', async (req, res) => {
   try {
     const jobs = await readJobsFromGithub();
@@ -179,37 +182,157 @@ app.get('/api/jobs', async (req, res) => {
 
 app.post('/api/jobs', authenticateToken, async (req, res) => {
   try {
-    const { title, description, location, salary, userId, createdBy } = req.body;
+    const {
+      title,
+      description,
+      companyName,
+      location,
+      domain,
+      workType,
+      employmentType,
+      userType,
+      salaryRange,
+      applyLink,
+      userId,
+      createdBy
+    } = req.body;
     
-    if (!title || !description) {
-      return res.status(400).json({ error: 'Title and description are required' });
+    // Validation
+    if (!title || !description || !companyName) {
+      return res.status(400).json({ 
+        error: 'Required fields missing. Title, description, and company name are required.' 
+      });
     }
 
+    // Read current jobs
     const jobs = await readJobsFromGithub();
+
+    // Create new job object with all fields
     const newJob = {
       id: jobs.length > 0 ? Math.max(...jobs.map(job => job.id)) + 1 : 1,
       title,
       description,
-      location: location || 'NA',
-      salary: salary || 'NA',
-      userId: userId || req.user.userId, // Ensure userId is always set
-      createdBy: createdBy || req.user.username, // Ensure createdBy is always set
-      createdAt: new Date().toISOString()
+      companyName,
+      location,
+      domain,
+      workType,
+      employmentType,
+      userType,
+      salaryRange,
+      applyLink,
+      userId: userId || req.user.userId,
+      createdBy: createdBy || req.user.username,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
 
+    // Add new job to array
     jobs.push(newJob);
+
+    // Update GitHub repository
     await updateGithubJobs(jobs);
     
-    res.status(201).json(newJob);
+    // Send response
+    res.status(201).json({
+      message: 'Job created successfully',
+      job: newJob
+    });
   } catch (error) {
     console.error('Error creating job:', error);
-    res.status(500).json({ error: 'Failed to create job' });
+    res.status(500).json({ 
+      error: 'Failed to create job',
+      details: error.message 
+    });
+  }
+});
+
+// Update existing job
+app.put('/api/jobs/:id', authenticateToken, async (req, res) => {
+  try {
+    const jobId = parseInt(req.params.id);
+    const jobs = await readJobsFromGithub();
+    
+    const jobIndex = jobs.findIndex(job => job.id === jobId);
+    
+    if (jobIndex === -1) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+
+    // Verify user owns this job
+    if (jobs[jobIndex].userId !== req.user.userId) {
+      return res.status(403).json({ error: 'Not authorized to update this job' });
+    }
+
+    // Update job with new data while preserving existing fields
+    const updatedJob = {
+      ...jobs[jobIndex],
+      ...req.body,
+      updatedAt: new Date().toISOString()
+    };
+
+    jobs[jobIndex] = updatedJob;
+    
+    await updateGithubJobs(jobs);
+    
+    res.json({
+      message: 'Job updated successfully',
+      job: updatedJob
+    });
+  } catch (error) {
+    console.error('Error updating job:', error);
+    res.status(500).json({ 
+      error: 'Failed to update job',
+      details: error.message 
+    });
+  }
+});
+
+// Delete job
+app.delete('/api/jobs/:id', authenticateToken, async (req, res) => {
+  try {
+    const jobId = parseInt(req.params.id);
+    const jobs = await readJobsFromGithub();
+    
+    const jobIndex = jobs.findIndex(job => job.id === jobId);
+    
+    if (jobIndex === -1) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+
+    // Verify user owns this job
+    if (jobs[jobIndex].userId !== req.user.userId) {
+      return res.status(403).json({ error: 'Not authorized to delete this job' });
+    }
+
+    // Remove the job
+    jobs.splice(jobIndex, 1);
+    
+    await updateGithubJobs(jobs);
+    
+    res.json({
+      message: 'Job deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting job:', error);
+    res.status(500).json({ 
+      error: 'Failed to delete job',
+      details: error.message 
+    });
   }
 });
 
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'OK' });
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({
+    error: 'Internal server error',
+    details: process.env.NODE_ENV === 'development' ? err.message : undefined
+  });
 });
 
 app.listen(port, () => {
