@@ -231,5 +231,22 @@
     "createdBy": "Shreyas-M-246418",
     "createdAt": "2024-11-24T09:54:48.816Z",
     "updatedAt": "2024-11-24T09:54:48.816Z"
+  },
+  {
+    "id": 26,
+    "title": "Testing Ui",
+    "description": "testing",
+    "companyName": "company2",
+    "location": "location2",
+    "domain": "UI/UX",
+    "workType": "hybrid",
+    "employmentType": "parttime",
+    "userType": "student",
+    "salaryRange": "NA",
+    "applyLink": "https://www.google.com",
+    "userId": 148254896,
+    "createdBy": "Shreyas M",
+    "createdAt": "2024-11-24T19:47:05.014Z",
+    "updatedAt": "2024-11-24T19:47:05.015Z"
   }
 ]
