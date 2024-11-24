@@ -184,5 +184,35 @@
     "userId": 148254896,
     "createdBy": "Shreyas-M-246418",
     "createdAt": "2024-11-14T09:01:43.000Z"
+  },
+  {
+    "id": 22,
+    "title": "motion graphic designer",
+    "description": "Animate complex topics in simpler visual way!",
+    "location": "RR nagar",
+    "salary": "$15000",
+    "userId": 165544829,
+    "createdBy": "Kishoreeeeeees",
+    "createdAt": "2024-11-14T12:02:04.096Z"
+  },
+  {
+    "id": 23,
+    "title": "Backend Developer",
+    "description": "backend developer intern\nJD\n\napply at: https://google.com",
+    "location": "REVA University",
+    "salary": "Unpaid Internship",
+    "userId": 25027415,
+    "createdBy": "Ganesh Prasad Rao",
+    "createdAt": "2024-11-15T03:35:30.355Z"
+  },
+  {
+    "id": 24,
+    "title": "Backend Developer",
+    "description": "apply at site",
+    "location": "REVA University",
+    "salary": "Unpaid Internship",
+    "userId": 25027415,
+    "createdBy": "mister-rao",
+    "createdAt": "2024-11-15T03:38:15.085Z"
   }
 ]
