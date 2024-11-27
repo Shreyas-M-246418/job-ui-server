@@ -248,5 +248,22 @@
     "createdBy": "Shreyas M",
     "createdAt": "2024-11-24T19:47:05.014Z",
     "updatedAt": "2024-11-24T19:47:05.015Z"
+  },
+  {
+    "id": 27,
+    "title": "testing",
+    "description": "testing",
+    "companyName": "Testing",
+    "location": "Pune",
+    "domain": "Machine Learning",
+    "workType": "on site",
+    "employmentType": "full time",
+    "userType": "fresher",
+    "salaryRange": "NA",
+    "applyLink": "https://www.google.com",
+    "userId": 148254896,
+    "createdBy": "Shreyas-M-246418",
+    "createdAt": "2024-11-27T04:55:49.928Z",
+    "updatedAt": "2024-11-27T04:55:49.928Z"
   }
 ]
