@@ -282,5 +282,22 @@
     "createdBy": "Shreyas-M-246418",
     "createdAt": "2024-11-27T04:56:39.724Z",
     "updatedAt": "2024-11-27T04:56:39.724Z"
+  },
+  {
+    "id": 29,
+    "title": "Machine Learning Engineer",
+    "description": "Builds AI models and systems that can learn and make decisions from data.",
+    "companyName": "A6",
+    "location": "Kochi",
+    "domain": "Machine Learning",
+    "workType": "on site",
+    "employmentType": "full time",
+    "userType": "professional",
+    "salaryRange": "$15000",
+    "applyLink": "",
+    "userId": 105532060,
+    "createdBy": "suk03",
+    "createdAt": "2024-11-28T07:02:22.733Z",
+    "updatedAt": "2024-11-28T07:02:22.733Z"
   }
 ]
