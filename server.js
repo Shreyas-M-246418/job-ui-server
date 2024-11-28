@@ -89,7 +89,8 @@ app.use(cors({
   origin: process.env.CLIENT_URL || 'https://job-ui-six.vercel.app',
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
+  credentials: true,
+  exposedHeaders: ['Set-Cookie']
 }));
 
 app.use(express.json());
