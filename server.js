@@ -136,7 +136,7 @@ app.post('/auth/github/callback', async (req, res) => {
       headers: {
         Authorization: `Bearer ${accessToken}`
       }
-    });
+    }); 
 
     const user = {
       id: userResponse.data.id,
