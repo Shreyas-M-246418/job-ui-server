@@ -316,5 +316,22 @@
     "createdBy": "Shreyas M",
     "createdAt": "2024-12-02T10:06:02.125Z",
     "updatedAt": "2024-12-02T10:06:02.125Z"
+  },
+  {
+    "id": 31,
+    "title": "NA",
+    "description": "NA",
+    "companyName": "Testing",
+    "location": "NA",
+    "domain": "Frontend",
+    "workType": "hybrid",
+    "employmentType": "internship",
+    "userType": "fresher",
+    "salaryRange": "NA",
+    "applyLink": "https://www.google.com",
+    "userId": 148254896,
+    "createdBy": "Shreyas M",
+    "createdAt": "2024-12-02T10:09:41.198Z",
+    "updatedAt": "2024-12-02T10:09:41.198Z"
   }
 ]
