@@ -299,5 +299,22 @@
     "createdBy": "suk03",
     "createdAt": "2024-11-28T07:02:22.733Z",
     "updatedAt": "2024-11-28T07:02:22.733Z"
+  },
+  {
+    "id": 30,
+    "title": "Testing",
+    "description": "testing ",
+    "companyName": "Amazon",
+    "location": "Bangalore",
+    "domain": "UI/UX",
+    "workType": "remote",
+    "employmentType": "full time",
+    "userType": "student",
+    "salaryRange": "NA",
+    "applyLink": "https://www.google.com",
+    "userId": 148254896,
+    "createdBy": "Shreyas M",
+    "createdAt": "2024-12-02T10:06:02.125Z",
+    "updatedAt": "2024-12-02T10:06:02.125Z"
   }
 ]
