@@ -589,6 +589,41 @@ app.post('/api/jobs', authenticateToken, async (req, res) => {
     });
   }
 });
+// Get all jobs endpoint
+app.get('/api/jobs', async (req, res) => {
+  try {
+    const jobs = await readJobsFromGithub();
+    const userId = req.query.userId;
+
+    if (userId) {
+      // Convert both IDs to strings for comparison
+      const userJobs = jobs.filter(job => String(job.userId) === String(userId));
+      res.json(userJobs);
+    } else {
+      res.json(jobs);
+    }
+  } catch (error) {
+    console.error('Error reading jobs:', error);
+    res.status(500).json({ error: 'Failed to fetch jobs' });
+  }
+});
+
+// Get single job endpoint
+app.get('/api/jobs/:id', async (req, res) => {
+  try {
+    const jobs = await readJobsFromGithub();
+    const job = jobs.find(job => job.id === parseInt(req.params.id));
+    
+    if (!job) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+    
+    res.json(job);
+  } catch (error) {
+    console.error('Error fetching job:', error);
+    res.status(500).json({ error: 'Failed to fetch job' });
+  }
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {
