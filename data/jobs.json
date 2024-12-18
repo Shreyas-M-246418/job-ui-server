@@ -333,5 +333,25 @@
     "createdBy": "Shreyas M",
     "createdAt": "2024-12-02T10:09:41.198Z",
     "updatedAt": "2024-12-02T10:09:41.198Z"
+  },
+  {
+    "id": 32,
+    "title": "Testing",
+    "description": "Using gemini for spam and summary",
+    "companyName": "Testing",
+    "location": "Pune",
+    "domain": "Machine Learning",
+    "workType": "on site",
+    "employmentType": "full time",
+    "userType": "student",
+    "salaryRange": "Unpaid",
+    "applyLink": "https://www.google.com",
+    "careerLink": "https://setu.co/careers",
+    "companySummary": null,
+    "isSpam": true,
+    "userId": 148254896,
+    "createdBy": "Shreyas-M-246418",
+    "createdAt": "2024-12-18T08:07:28.417Z",
+    "updatedAt": "2024-12-18T08:07:28.417Z"
   }
 ]
