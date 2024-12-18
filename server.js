@@ -360,6 +360,59 @@ const port = process.env.PORT || 3001;
 // Initialize Google AI
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
+// Auth routes
+app.get('/auth/github', (req, res) => {
+  const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${process.env.GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.GITHUB_CALLBACK_URL)}`;
+  res.json({ url: githubAuthUrl });
+});
+
+app.post('/auth/github/callback', async (req, res) => {
+  try {
+    const { code } = req.body;
+    
+    const tokenResponse = await axios.post('https://github.com/login/oauth/access_token', {
+      client_id: process.env.GITHUB_CLIENT_ID,
+      client_secret: process.env.GITHUB_CLIENT_SECRET,
+      code: code,
+      redirect_uri: process.env.GITHUB_CALLBACK_URL
+    }, {
+      headers: {
+        Accept: 'application/json'
+      }
+    });
+
+    const accessToken = tokenResponse.data.access_token;
+
+    const userResponse = await axios.get('https://api.github.com/user', {
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
+    }); 
+
+    const user = {
+      id: userResponse.data.id,
+      username: userResponse.data.login,
+      name: userResponse.data.name || userResponse.data.login,
+      email: userResponse.data.email
+    };
+
+    const token = jwt.sign(
+      { userId: user.id, username: user.username },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '24h' }
+    );
+
+    res.json({ user, token });
+  } catch (error) {
+    console.error('GitHub callback error:', error);
+    res.status(500).json({ error: 'Authentication failed' });
+  }
+});
+
+app.get('/auth/verify', authenticateToken, (req, res) => {
+  res.json({ user: req.user });
+});
+
 // Function to scrape and summarize career page
 async function scrapeAndSummarizeCareerPage(url) {
   try {
