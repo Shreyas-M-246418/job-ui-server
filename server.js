@@ -380,7 +380,7 @@ async function scrapeAndSummarizeCareerPage(url) {
     await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 });
     const content = await page.content();
     await browser.close();
-
+ 
     const $ = cheerio.load(content);
     const text = $('body').text().replace(/\s+/g, ' ').trim();
 
