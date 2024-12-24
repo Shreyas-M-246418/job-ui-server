@@ -367,8 +367,15 @@ async function scrapeAndSummarizeCareerPage(url) {
   try {
     const browser = await puppeteer.launch({ 
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'] // Required for some hosting environments
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--single-process'
+      ],
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/google-chrome'
     });
+    
     const page = await browser.newPage();
     await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 });
     const content = await page.content();
@@ -645,7 +652,7 @@ app.post('/api/jobs', authenticateToken, async (req, res) => {
   }
 });
 // Get all jobs endpoint
-app.get('/api/jobs', async (req, res) => {
+app.get('/api/jobs', authenticateToken, async (req, res) => {
   try {
     const jobs = await readJobsFromGithub();
     const userId = req.query.userId;
