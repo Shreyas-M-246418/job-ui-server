@@ -353,5 +353,25 @@
     "createdBy": "Shreyas-M-246418",
     "createdAt": "2024-12-18T08:07:28.417Z",
     "updatedAt": "2024-12-18T08:07:28.417Z"
+  },
+  {
+    "id": 33,
+    "title": "testing",
+    "description": "testing scraping",
+    "companyName": "Testing",
+    "location": "Hyderabad",
+    "domain": "Machine Learning",
+    "workType": "remote",
+    "employmentType": "full time",
+    "userType": "professional",
+    "salaryRange": "Unpaid",
+    "applyLink": "https://www.google.com",
+    "careerLink": "https://setu.co/careers",
+    "companySummary": null,
+    "isSpam": true,
+    "userId": 148254896,
+    "createdBy": "Shreyas-M-246418",
+    "createdAt": "2024-12-24T04:48:21.781Z",
+    "updatedAt": "2024-12-24T04:48:21.781Z"
   }
 ]
