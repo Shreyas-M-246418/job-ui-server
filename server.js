@@ -651,6 +651,19 @@ app.post('/api/jobs', authenticateToken, async (req, res) => {
     });
   }
 });
+
+// Public jobs endpoint (no auth required)
+app.get('/api/public/jobs', async (req, res) => {
+  try {
+    const jobs = await readJobsFromGithub();
+    res.json(jobs);
+  } catch (error) {
+    console.error('Error reading jobs:', error);
+    res.status(500).json({ error: 'Failed to fetch jobs' });
+  }
+});
+
+
 // Get all jobs endpoint
 app.get('/api/jobs', authenticateToken, async (req, res) => {
   try {
