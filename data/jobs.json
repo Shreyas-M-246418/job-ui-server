@@ -433,5 +433,25 @@
     "createdBy": "Shreyas M",
     "createdAt": "2024-12-27T05:00:59.923Z",
     "updatedAt": "2024-12-27T05:00:59.923Z"
+  },
+  {
+    "id": 37,
+    "title": "testing",
+    "description": "testing scraping again",
+    "companyName": "Testing",
+    "location": "Hyderabad",
+    "domain": "Backend",
+    "workType": "remote",
+    "employmentType": "internship",
+    "userType": "fresher",
+    "salaryRange": "Unpaid",
+    "applyLink": "https://www.google.com",
+    "careerLink": "https://www.ibm.com/in-en/careers",
+    "companySummary": "**Company Overview:**\n\nIBM is a global technology company that focuses on developing and delivering advanced infrastructure platforms that empower businesses and contribute to societal progress. Driven by sustainable and secure solutions, IBM aims to enhance data utilization and promote technological advancements for a better world.\n\n**Company Culture and Values:**\n\nIBM fosters a culture of openness, collaboration, and trust. Employees are encouraged to explore their curiosity and make innovative contributions. The company's core values include dedication to client success, innovation, trust, and personal responsibility. IBM believes in diversity and values the unique perspectives of its global workforce.\n\n**Growth and Development:**\n\nIBM provides ample opportunities for career growth. Employees can explore diverse roles within the company's various teams, including software engineering, sales, consulting, data and analytics, infrastructure and technology, cloud, security, enterprise operations, research, and design and UX. IBM supports continuous learning and encourages its employees to expand their skills through professional development programs and training.\n\n**Benefits and Perks:**\n\nInformation on specific benefits and perks offered by IBM is not provided in the provided content.",
+    "isSpam": true,
+    "userId": 148254896,
+    "createdBy": "Shreyas-M-246418",
+    "createdAt": "2024-12-27T05:19:24.237Z",
+    "updatedAt": "2024-12-27T05:19:24.237Z"
   }
 ]
