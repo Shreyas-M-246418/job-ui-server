@@ -164,7 +164,7 @@ const updateGithubJobs = async (jobs) => {
     throw error;
   }
 };
-
+ 
 // Middleware setup
 app.use(cors({
   origin: process.env.CLIENT_URL || 'https://job-ui-six.vercel.app',
