@@ -25,52 +25,62 @@ async function scrapeAndSummarizeCareerPage(url) {
       return null;
     }
 
-    const browser = await puppeteer.launch({ 
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--single-process'
-      ],
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/google-chrome'
+    console.log('Starting to scrape:', url);
+    
+    // Fetch the page content
+    const response = await axios.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      }
     });
-    
-    console.log('Browser launched successfully');
-    
-    const page = await browser.newPage();
-    console.log('Navigating to URL:', url);
-    
-    await page.goto(url, { waitUntil: 'networkidle0', timeout: 60000 });
-    console.log('Page loaded successfully');
-    
-    const content = await page.evaluate(() => {
-      const mainContent = document.body.innerText;
-      return mainContent.replace(/\s+/g, ' ').trim();
-    });
-    
-    await browser.close();
-    console.log('Browser closed successfully');
 
-    if (!content) {
-      console.error('No content extracted from page');
+    // Load the HTML content into cheerio
+    const $ = cheerio.load(response.data);
+
+    // Remove unwanted elements
+    $('script, style, nav, header, footer, iframe, noscript').remove();
+
+    // Extract text from main content areas
+    const mainContent = $('main, article, .content, .main-content, #content, #main-content')
+      .text()
+      .trim();
+
+    // If no main content found, get body text
+    const bodyContent = mainContent || $('body').text().trim();
+
+    // Clean the text
+    const cleanedText = bodyContent
+      .replace(/\s+/g, ' ')
+      .replace(/\n+/g, ' ')
+      .trim();
+
+    if (!cleanedText || cleanedText.length < 50) {
+      console.error('Insufficient content extracted from page');
       return null;
     }
 
-    console.log('Content length:', content.length);
-    
+    // Use Google Gemini to summarize
     const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-    const prompt = `Summarize this company's career page content in 200 words, focusing on:
-    1. Company culture and values
-    2. Growth opportunities
-    3. Work environment and benefits
-    
-    Content: ${content.substring(0, 4000)}`; // Limit content length
+    const prompt = `Analyze and summarize the following company career/about page content. Focus on these key aspects:
+
+1. Company Overview: What does the company do and what is their mission?
+2. Company Culture and Values: What are their core values and workplace culture?
+3. Growth and Development: What opportunities exist for career growth?
+4. Benefits and Perks: What do they offer employees?
+
+Please provide a professional, concise summary in 3-4 paragraphs. If any information is missing, focus on what is available.
+
+Content to analyze: ${cleanedText.substring(0, 5000)}`; // Limit text length
     
     const result = await model.generateContent(prompt);
     const summary = result.response.text();
     
-    console.log('Summary generated successfully:', summary.substring(0, 100) + '...');
+    if (!summary) {
+      console.error('Failed to generate summary');
+      return null;
+    }
+
+    console.log('Successfully generated summary');
     return summary;
 
   } catch (error) {
