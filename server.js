@@ -20,106 +20,59 @@ const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 // Function to scrape and summarize career page
 async function scrapeAndSummarizeCareerPage(url) {
   try {
-    // Validate URL
     if (!url || !url.startsWith('http')) {
       console.error('Invalid URL provided');
       return null;
     }
 
-    // Launch browser with proper error handling
-    let browser;
-    try {
-      browser = await puppeteer.launch({ 
-        headless: true,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--single-process',
-          '--disable-gpu',
-          '--disable-software-rasterizer'
-        ],
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/google-chrome',
-        timeout: 60000
-      });
-    } catch (error) {
-      console.error('Browser launch failed:', error);
+    const browser = await puppeteer.launch({ 
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--single-process'
+      ],
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/google-chrome'
+    });
+    
+    console.log('Browser launched successfully');
+    
+    const page = await browser.newPage();
+    console.log('Navigating to URL:', url);
+    
+    await page.goto(url, { waitUntil: 'networkidle0', timeout: 60000 });
+    console.log('Page loaded successfully');
+    
+    const content = await page.evaluate(() => {
+      const mainContent = document.body.innerText;
+      return mainContent.replace(/\s+/g, ' ').trim();
+    });
+    
+    await browser.close();
+    console.log('Browser closed successfully');
+
+    if (!content) {
+      console.error('No content extracted from page');
       return null;
     }
 
-    try {
-      // Create new page with proper timeout and settings
-      const page = await browser.newPage();
-      await page.setDefaultNavigationTimeout(30000);
-      await page.setRequestInterception(true);
-      
-      // Optimize performance by blocking unnecessary resources
-      page.on('request', (request) => {
-        if (['image', 'stylesheet', 'font', 'media'].includes(request.resourceType())) {
-          request.abort();
-        } else {
-          request.continue();
-        }
-      });
+    console.log('Content length:', content.length);
+    
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const prompt = `Summarize this company's career page content in 200 words, focusing on:
+    1. Company culture and values
+    2. Growth opportunities
+    3. Work environment and benefits
+    
+    Content: ${content.substring(0, 4000)}`; // Limit content length
+    
+    const result = await model.generateContent(prompt);
+    const summary = result.response.text();
+    
+    console.log('Summary generated successfully:', summary.substring(0, 100) + '...');
+    return summary;
 
-      // Navigate to page with proper error handling
-      await page.goto(url, { 
-        waitUntil: 'networkidle0', 
-        timeout: 30000 
-      });
-
-      // Extract text content using multiple methods
-      const content = await page.evaluate(() => {
-        // Remove unnecessary elements
-        const elementsToRemove = document.querySelectorAll('header, footer, nav, script, style, iframe');
-        elementsToRemove.forEach(el => el.remove());
-
-        // Get main content
-        const mainContent = document.querySelector('main') || document.querySelector('article') || document.body;
-        return mainContent.innerText;
-      });
-
-      await browser.close();
-
-      // Clean up the text
-      const cleanedText = content
-        .replace(/\s+/g, ' ')
-        .replace(/\n+/g, ' ')
-        .trim();
-
-      if (!cleanedText || cleanedText.length < 50) {
-        console.error('Insufficient content extracted from page');
-        return null;
-      }
-
-      // Use Google Gemini to summarize with improved prompt
-      const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-      const prompt = `Analyze and summarize the following company career/about page content. Focus on these key aspects:
-
-1. Company Overview: What does the company do and what is their mission?
-2. Company Culture and Values: What are their core values and workplace culture?
-3. Growth and Development: What opportunities exist for career growth?
-4. Benefits and Perks: What do they offer employees?
-
-Please provide a professional, concise summary in 3-4 paragraphs. If any information is missing, focus on what is available.
-
-Content to analyze: ${cleanedText.substring(0, 5000)}`; // Limit text length to avoid token limits
-      
-      const result = await model.generateContent(prompt);
-      const summary = result.response.text();
-      
-      if (!summary) {
-        console.error('Failed to generate summary');
-        return null;
-      }
-
-      return summary;
-
-    } catch (error) {
-      console.error('Error during page processing:', error);
-      await browser.close();
-      return null;
-    }
   } catch (error) {
     console.error('Error in scrapeAndSummarizeCareerPage:', error);
     return null;
@@ -184,8 +137,10 @@ const updateGithubJobs = async (jobs) => {
     );
 
     const updatedContent = Buffer.from(JSON.stringify(jobs, null, 2)).toString('base64');
-
-    await axios.put(
+    
+    console.log('Updating GitHub with new jobs data');
+    
+    const response = await axios.put(
       `https://api.github.com/repos/${process.env.GITHUB_REPO_OWNER}/${process.env.GITHUB_REPO_NAME}/contents/data/jobs.json`,
       {
         message: 'Update jobs.json via API',
@@ -196,10 +151,13 @@ const updateGithubJobs = async (jobs) => {
         headers: {
           Authorization: `token ${process.env.GITHUB_ACCESS_TOKEN}`,
           Accept: 'application/vnd.github.v3+json'
-        }
+        },
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity
       }
     );
 
+    console.log('GitHub update successful');
     return true;
   } catch (error) {
     console.error('Error updating GitHub repository:', error);
@@ -328,7 +286,11 @@ app.post('/api/jobs', authenticateToken, async (req, res) => {
     if (careerLink) {
       console.log('Attempting to scrape career page:', careerLink);
       companySummary = await scrapeAndSummarizeCareerPage(careerLink);
-      console.log('Career page summary:', companySummary);
+      if (!companySummary) {
+        console.log('Failed to generate company summary');
+      } else {
+        console.log('Company summary generated successfully');
+      }
     }
 
     // Check for spam
@@ -354,7 +316,7 @@ app.post('/api/jobs', authenticateToken, async (req, res) => {
       salaryRange,
       applyLink,
       careerLink,
-      companySummary,
+      companySummary: companySummary || null,
       isSpam,
       userId: userId || req.user.userId,
       createdBy: createdBy || req.user.username,
