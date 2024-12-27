@@ -11,7 +11,7 @@ require('dotenv').config();
 
 const app = express();
 const port = process.env.PORT || 3001;
-
+ 
 // Initialize Google AI
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
