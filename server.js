@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const axios = require('axios');
 const session = require('express-session');
 const FileStore = require('session-file-store')(session);
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+//const { GoogleGenerativeAI } = require('@google/generative-ai');
 const puppeteer = require('puppeteer');
 const cheerio = require('cheerio');
 require('dotenv').config();
@@ -13,12 +13,12 @@ const app = express();
 const port = process.env.PORT || 3001;
  
 // Initialize Google AI
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+//const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
 
 
 // Function to scrape and summarize career page
-async function scrapeAndSummarizeCareerPage(url) {
+/*async function scrapeAndSummarizeCareerPage(url) {
   try {
     if (!url || !url.startsWith('http')) {
       console.error('Invalid URL provided');
@@ -111,7 +111,7 @@ async function detectSpamJob(jobDetails) {
     return false;
   }
 }
-
+*/
 // Helper function to read jobs from GitHub
 const readJobsFromGithub = async () => {
   try {
@@ -267,6 +267,15 @@ app.get('/auth/verify', authenticateToken, (req, res) => {
 });
 
 // Updated job creation endpoint
+// Remove these imports
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+
+// Remove these functions as they'll be handled client-side
+// - scrapeAndSummarizeCareerPage
+// - detectSpamJob
+
+// Modify the POST /api/jobs endpoint
 app.post('/api/jobs', authenticateToken, async (req, res) => {
   try {
     const {
@@ -282,7 +291,9 @@ app.post('/api/jobs', authenticateToken, async (req, res) => {
       applyLink,
       careerLink,
       userId,
-      createdBy
+      createdBy,
+      companySummary, // Now received from client
+      isSpam // Now received from client
     } = req.body;
     
     if (!title || !description || !companyName) {
@@ -290,26 +301,6 @@ app.post('/api/jobs', authenticateToken, async (req, res) => {
         error: 'Required fields missing. Title, description, and company name are required.' 
       });
     }
-
-    // Scrape and summarize career page if URL is provided
-    let companySummary = null;
-    if (careerLink) {
-      console.log('Attempting to scrape career page:', careerLink);
-      companySummary = await scrapeAndSummarizeCareerPage(careerLink);
-      if (!companySummary) {
-        console.log('Failed to generate company summary');
-      } else {
-        console.log('Company summary generated successfully');
-      }
-    }
-
-    // Check for spam
-    const isSpam = await detectSpamJob({
-      title,
-      description,
-      companyName,
-      salaryRange
-    });
 
     const jobs = await readJobsFromGithub();
 
@@ -326,7 +317,7 @@ app.post('/api/jobs', authenticateToken, async (req, res) => {
       salaryRange,
       applyLink,
       careerLink,
-      companySummary: companySummary || null,
+      companySummary,
       isSpam,
       userId: userId || req.user.userId,
       createdBy: createdBy || req.user.username,
