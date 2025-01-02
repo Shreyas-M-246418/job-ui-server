@@ -266,15 +266,6 @@ app.get('/auth/verify', authenticateToken, (req, res) => {
   res.json({ user: req.user });
 });
 
-// Updated job creation endpoint
-// Remove these imports
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-
-// Remove these functions as they'll be handled client-side
-// - scrapeAndSummarizeCareerPage
-// - detectSpamJob
-
 // Modify the POST /api/jobs endpoint
 app.post('/api/jobs', authenticateToken, async (req, res) => {
   try {
