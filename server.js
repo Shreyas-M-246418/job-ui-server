@@ -112,6 +112,45 @@ async function detectSpamJob(jobDetails) {
   }
 }
 */
+
+// Helper function to scrape career page content
+const scrapeCareerPage = async (url) => {
+  let browser = null;
+  try {
+    browser = await puppeteer.launch({
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      headless: 'new'
+    });
+    const page = await browser.newPage();
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+    
+    // Set a reasonable timeout
+    await page.goto(url, { 
+      waitUntil: 'networkidle0', 
+      timeout: 30000 
+    });
+    
+    const content = await page.evaluate(() => {
+      // Remove scripts, styles, and other non-content elements
+      const scripts = document.getElementsByTagName('script');
+      const styles = document.getElementsByTagName('style');
+      Array.from(scripts).forEach(script => script.remove());
+      Array.from(styles).forEach(style => style.remove());
+      
+      return document.body.innerText;
+    });
+
+    return content.trim();
+  } catch (error) {
+    console.error('Error scraping career page:', error);
+    throw new Error('Failed to scrape career page content');
+  } finally {
+    if (browser) {
+      await browser.close();
+    }
+  }
+};
+
 // Helper function to read jobs from GitHub
 const readJobsFromGithub = async () => {
   try {
@@ -175,6 +214,33 @@ const updateGithubJobs = async (jobs) => {
   }
 };
  
+// Add the proxy endpoint for career pages
+app.get('/api/proxy-career-page', authenticateToken, async (req, res) => {
+  try {
+    const { url } = req.query;
+    
+    if (!url) {
+      return res.status(400).json({ error: 'URL parameter is required' });
+    }
+
+    // Validate URL
+    try {
+      new URL(url);
+    } catch (e) {
+      return res.status(400).json({ error: 'Invalid URL provided' });
+    }
+
+    const content = await scrapeCareerPage(url);
+    res.json({ content });
+  } catch (error) {
+    console.error('Error proxying career page:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch career page',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
 // Middleware setup
 app.use(cors({
   origin: process.env.CLIENT_URL || 'https://job-ui-six.vercel.app',
@@ -184,7 +250,8 @@ app.use(cors({
   exposedHeaders: ['Set-Cookie']
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(session({ 
   store: new FileStore({
     path: './sessions'
@@ -287,20 +354,31 @@ app.post('/api/jobs', authenticateToken, async (req, res) => {
       isSpam // Now received from client
     } = req.body;
     
-    if (!title || !description || !companyName) {
-      return res.status(400).json({ 
-        error: 'Required fields missing. Title, description, and company name are required.' 
-      });
+    // Validate URLs if provided
+    if (applyLink) {
+      try {
+        new URL(applyLink);
+      } catch (e) {
+        return res.status(400).json({ error: 'Invalid apply link URL' });
+      }
+    }
+
+    if (careerLink) {
+      try {
+        new URL(careerLink);
+      } catch (e) {
+        return res.status(400).json({ error: 'Invalid career link URL' });
+      }
     }
 
     const jobs = await readJobsFromGithub();
 
     const newJob = {
       id: jobs.length > 0 ? Math.max(...jobs.map(job => job.id)) + 1 : 1,
-      title,
-      description,
-      companyName,
-      location,
+      title: title.trim(),
+      description: description.trim(),
+      companyName: companyName.trim(),
+      location: location?.trim(),
       domain,
       workType,
       employmentType,
@@ -325,9 +403,12 @@ app.post('/api/jobs', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating job:', error);
+    if (error.response?.status === 401) {
+      return res.status(401).json({ error: 'Authentication failed' });
+    }
     res.status(500).json({ 
       error: 'Failed to create job',
-      details: error.message 
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
@@ -393,6 +474,15 @@ app.use((err, req, res, next) => {
     details: process.env.NODE_ENV === 'development' ? err.message : undefined
   });
 });
+
+const rateLimit = require('express-rate-limit');
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100 // limit each IP to 100 requests per windowMs
+});
+
+app.use(limiter);
  
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
