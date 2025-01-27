@@ -312,7 +312,7 @@ app.get('/api/proxy-career-page', authenticateToken, async (req, res) => {
       await browser.close();
     }
   }
-});
+}); 
 // Auth routes
 app.get('/auth/github', (req, res) => {
   const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${process.env.GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.GITHUB_CALLBACK_URL)}`;
