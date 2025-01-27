@@ -270,6 +270,38 @@ app.get('/api/proxy-career-page', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Invalid URL provided' });
     }
 
+    // First try with Axios and Cheerio for faster scraping
+    try {
+      const response = await axios.get(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        },
+        timeout: 10000
+      });
+
+      const $ = cheerio.load(response.data);
+      
+      // Remove unwanted elements
+      $('script, style, nav, header, footer, iframe, noscript').remove();
+
+      // Extract text from main content areas
+      const mainContent = $('main, article, .content, .main-content, #content, #main-content')
+        .text()
+        .trim();
+
+      if (mainContent && mainContent.length > 50) {
+        const cleanedText = mainContent
+          .replace(/\s+/g, ' ')
+          .replace(/\n+/g, ' ')
+          .trim();
+          
+        return res.json({ content: cleanedText });
+      }
+    } catch (axiosError) {
+      console.log('Axios scraping failed, falling back to Puppeteer');
+    }
+
+    // Fallback to Puppeteer if Axios fails
     browser = await puppeteer.launch({
       args: [
         '--no-sandbox',
@@ -285,22 +317,46 @@ app.get('/api/proxy-career-page', authenticateToken, async (req, res) => {
     const page = await browser.newPage();
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
     
-    // Set a reasonable timeout and handle navigation
-    await page.goto(url, { 
-      waitUntil: 'networkidle0', 
-      timeout: 20000 
+    // Set request interception to block unnecessary resources
+    await page.setRequestInterception(true);
+    page.on('request', (request) => {
+      if (['image', 'stylesheet', 'font', 'script'].includes(request.resourceType())) {
+        request.abort();
+      } else {
+        request.continue();
+      }
     });
 
-    // Extract text content
+    await page.goto(url, { 
+      waitUntil: 'domcontentloaded', 
+      timeout: 30000 
+    });
+
+    // Wait for main content to load
+    await page.waitForSelector('main, article, .content, .main-content, #content, #main-content, body', {
+      timeout: 5000
+    }).catch(() => console.log('Selector timeout - proceeding with body content'));
+
     const content = await page.evaluate(() => {
-      const article = document.querySelector('article') || document.querySelector('main') || document.body;
-      return article.innerText;
+      // Remove unwanted elements
+      const elementsToRemove = document.querySelectorAll('script, style, nav, header, footer, iframe, noscript');
+      elementsToRemove.forEach(el => el.remove());
+
+      // Try to get main content first
+      const mainContent = document.querySelector('main, article, .content, .main-content, #content, #main-content');
+      const text = mainContent ? mainContent.innerText : document.body.innerText;
+      
+      return text.replace(/\s+/g, ' ').trim();
     });
 
     await browser.close();
     browser = null;
 
-    res.json({ content: content.trim() });
+    if (!content || content.length < 50) {
+      return res.status(400).json({ error: 'Insufficient content found on page' });
+    }
+
+    res.json({ content });
   } catch (error) {
     console.error('Error in proxy-career-page:', error);
     res.status(500).json({ 
@@ -312,7 +368,8 @@ app.get('/api/proxy-career-page', authenticateToken, async (req, res) => {
       await browser.close();
     }
   }
-}); 
+});
+
 // Auth routes
 app.get('/auth/github', (req, res) => {
   const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${process.env.GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.GITHUB_CALLBACK_URL)}`;
