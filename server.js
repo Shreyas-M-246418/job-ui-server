@@ -256,6 +256,7 @@ const updateGithubJobs = async (jobs) => {
  
 // Add the proxy endpoint for career pages
 app.get('/api/proxy-career-page', authenticateToken, async (req, res) => {
+  let browser = null;
   try {
     const { url } = req.query;
     
@@ -263,24 +264,55 @@ app.get('/api/proxy-career-page', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'URL parameter is required' });
     }
 
-    // Validate URL
     try {
       new URL(url);
     } catch (e) {
       return res.status(400).json({ error: 'Invalid URL provided' });
     }
 
-    const content = await scrapeCareerPage(url);
-    res.json({ content });
+    browser = await puppeteer.launch({
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--disable-gpu',
+        '--window-size=1920x1080'
+      ],
+      headless: 'new'
+    });
+
+    const page = await browser.newPage();
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+    
+    // Set a reasonable timeout and handle navigation
+    await page.goto(url, { 
+      waitUntil: 'networkidle0', 
+      timeout: 20000 
+    });
+
+    // Extract text content
+    const content = await page.evaluate(() => {
+      const article = document.querySelector('article') || document.querySelector('main') || document.body;
+      return article.innerText;
+    });
+
+    await browser.close();
+    browser = null;
+
+    res.json({ content: content.trim() });
   } catch (error) {
-    console.error('Error proxying career page:', error);
+    console.error('Error in proxy-career-page:', error);
     res.status(500).json({ 
       error: 'Failed to fetch career page',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
+  } finally {
+    if (browser) {
+      await browser.close();
+    }
   }
 });
-
 // Auth routes
 app.get('/auth/github', (req, res) => {
   const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${process.env.GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.GITHUB_CALLBACK_URL)}`;
