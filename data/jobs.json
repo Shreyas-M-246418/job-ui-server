@@ -473,5 +473,25 @@
     "createdBy": "Shreyas-M-246418",
     "createdAt": "2025-01-23T05:34:02.359Z",
     "updatedAt": "2025-01-23T05:34:02.359Z"
+  },
+  {
+    "id": 40,
+    "title": "Data Analyst",
+    "description": "Analyze the online sales data and other business data to identify the trends and patterns for better understanding of the market and business growth",
+    "companyName": "Zomato",
+    "location": "Gujurat",
+    "domain": "Data Science",
+    "workType": "remote",
+    "employmentType": "part time",
+    "userType": "student",
+    "salaryRange": "50000-70000",
+    "applyLink": "https://www.google.com",
+    "careerLink": "https://www.zomato.com/careers",
+    "companySummary": "Based on the job description, it appears that working at this company would involve a data-driven approach to understanding market trends and patterns. The company likely values analytical thinking and problem-solving skills, as the role requires analyzing online sales data and other business data to inform business growth decisions. The work environment may be fast-paced and dynamic, with a focus on staying up-to-date with market changes and adapting to new trends and patterns.\n\nIn terms of company culture, this role may be well-suited for individuals who are detail-oriented, organized, and able to work independently. The company may prioritize data-driven decision making and continuous improvement, which could create a culture of innovation and collaboration. However, the job description does not provide much insight into the company's values, mission, or work-life balance policies, so it's difficult to say for certain what the company culture is like.\n\nIn terms of growth opportunities, this role may be a stepping stone for individuals who are interested in data analysis and business strategy. With experience and skills, employees in this role may have opportunities to move into leadership positions or take on more strategic roles, such as business development or market research. However, the job description does not provide much information about opportunities for advancement or professional development.",
+    "isSpam": true,
+    "userId": 148254896,
+    "createdBy": "Shreyas-M-246418",
+    "createdAt": "2025-01-27T05:28:26.616Z",
+    "updatedAt": "2025-01-27T05:28:26.616Z"
   }
 ]
