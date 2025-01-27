@@ -256,7 +256,6 @@ const updateGithubJobs = async (jobs) => {
  
 // Add the proxy endpoint for career pages
 app.get('/api/proxy-career-page', authenticateToken, async (req, res) => {
-  let browser = null;
   try {
     const { url } = req.query;
     
@@ -270,103 +269,73 @@ app.get('/api/proxy-career-page', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Invalid URL provided' });
     }
 
-    // First try with Axios and Cheerio for faster scraping
-    try {
-      const response = await axios.get(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        },
-        timeout: 10000
-      });
+    console.log('Starting to scrape:', url);
+    
+    const response = await axios.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Cache-Control': 'max-age=0'
+      },
+      timeout: 15000,
+      maxRedirects: 5
+    });
 
-      const $ = cheerio.load(response.data);
-      
-      // Remove unwanted elements
-      $('script, style, nav, header, footer, iframe, noscript').remove();
+    const $ = cheerio.load(response.data);
 
-      // Extract text from main content areas
-      const mainContent = $('main, article, .content, .main-content, #content, #main-content')
-        .text()
-        .trim();
+    // Remove unwanted elements
+    $('script, style, nav, header, footer, iframe, noscript, img, svg, button').remove();
 
-      if (mainContent && mainContent.length > 50) {
-        const cleanedText = mainContent
-          .replace(/\s+/g, ' ')
-          .replace(/\n+/g, ' ')
-          .trim();
-          
-        return res.json({ content: cleanedText });
+    // Extract text from main content areas
+    let content = '';
+    const selectors = [
+      'main',
+      'article',
+      '.content',
+      '.main-content',
+      '#content',
+      '#main-content',
+      '.job-description',
+      '.career-content',
+      '.about-company',
+      '[role="main"]'
+    ];
+
+    for (const selector of selectors) {
+      const element = $(selector);
+      if (element.length) {
+        content = element.text().trim();
+        if (content.length > 100) break;
       }
-    } catch (axiosError) {
-      console.log('Axios scraping failed, falling back to Puppeteer');
     }
 
-    // Fallback to Puppeteer if Axios fails
-    browser = await puppeteer.launch({
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--disable-gpu',
-        '--window-size=1920x1080'
-      ],
-      headless: 'new'
-    });
+    // If no content found from specific selectors, get body text
+    if (!content || content.length < 100) {
+      content = $('body').text().trim();
+    }
 
-    const page = await browser.newPage();
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
-    
-    // Set request interception to block unnecessary resources
-    await page.setRequestInterception(true);
-    page.on('request', (request) => {
-      if (['image', 'stylesheet', 'font', 'script'].includes(request.resourceType())) {
-        request.abort();
-      } else {
-        request.continue();
-      }
-    });
+    // Clean the text
+    const cleanedText = content
+      .replace(/\s+/g, ' ')
+      .replace(/\n+/g, ' ')
+      .replace(/\t+/g, ' ')
+      .trim();
 
-    await page.goto(url, { 
-      waitUntil: 'domcontentloaded', 
-      timeout: 30000 
-    });
-
-    // Wait for main content to load
-    await page.waitForSelector('main, article, .content, .main-content, #content, #main-content, body', {
-      timeout: 5000
-    }).catch(() => console.log('Selector timeout - proceeding with body content'));
-
-    const content = await page.evaluate(() => {
-      // Remove unwanted elements
-      const elementsToRemove = document.querySelectorAll('script, style, nav, header, footer, iframe, noscript');
-      elementsToRemove.forEach(el => el.remove());
-
-      // Try to get main content first
-      const mainContent = document.querySelector('main, article, .content, .main-content, #content, #main-content');
-      const text = mainContent ? mainContent.innerText : document.body.innerText;
-      
-      return text.replace(/\s+/g, ' ').trim();
-    });
-
-    await browser.close();
-    browser = null;
-
-    if (!content || content.length < 50) {
+    if (!cleanedText || cleanedText.length < 50) {
       return res.status(400).json({ error: 'Insufficient content found on page' });
     }
 
-    res.json({ content });
+    res.json({ content: cleanedText });
+
   } catch (error) {
     console.error('Error in proxy-career-page:', error);
     res.status(500).json({ 
       error: 'Failed to fetch career page',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      details: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
-  } finally {
-    if (browser) {
-      await browser.close();
-    }
   }
 });
 
