@@ -4,7 +4,6 @@ const jwt = require('jsonwebtoken');
 const axios = require('axios');
 const session = require('express-session');
 const FileStore = require('session-file-store')(session);
-//const { GoogleGenerativeAI } = require('@google/generative-ai');
 const puppeteer = require('puppeteer');
 const cheerio = require('cheerio');
 require('dotenv').config();
@@ -12,106 +11,7 @@ require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 3001;
  
-// Initialize Google AI
-//const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
-
-
-// Function to scrape and summarize career page
-/*async function scrapeAndSummarizeCareerPage(url) {
-  try {
-    if (!url || !url.startsWith('http')) {
-      console.error('Invalid URL provided');
-      return null;
-    }
-
-    console.log('Starting to scrape:', url);
-    
-    // Fetch the page content
-    const response = await axios.get(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-      }
-    });
-
-    // Load the HTML content into cheerio
-    const $ = cheerio.load(response.data);
-
-    // Remove unwanted elements
-    $('script, style, nav, header, footer, iframe, noscript').remove();
-
-    // Extract text from main content areas
-    const mainContent = $('main, article, .content, .main-content, #content, #main-content')
-      .text()
-      .trim();
-
-    // If no main content found, get body text
-    const bodyContent = mainContent || $('body').text().trim();
-
-    // Clean the text
-    const cleanedText = bodyContent
-      .replace(/\s+/g, ' ')
-      .replace(/\n+/g, ' ')
-      .trim();
-
-    if (!cleanedText || cleanedText.length < 50) {
-      console.error('Insufficient content extracted from page');
-      return null;
-    }
-
-    // Use Google Gemini to summarize
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-    const prompt = `Analyze and summarize the following company career/about page content. Focus on these key aspects:
-
-1. Company Overview: What does the company do and what is their mission?
-2. Company Culture and Values: What are their core values and workplace culture?
-3. Growth and Development: What opportunities exist for career growth?
-4. Benefits and Perks: What do they offer employees?
-
-Please provide a professional, concise summary in 3-4 paragraphs. If any information is missing, focus on what is available.
-
-Content to analyze: ${cleanedText.substring(0, 5000)}`; // Limit text length
-    
-    const result = await model.generateContent(prompt);
-    const summary = result.response.text();
-    
-    if (!summary) {
-      console.error('Failed to generate summary');
-      return null;
-    }
-
-    console.log('Successfully generated summary');
-    return summary;
-
-  } catch (error) {
-    console.error('Error in scrapeAndSummarizeCareerPage:', error);
-    return null;
-  }
-}
-
-// Function to detect spam job posting
-async function detectSpamJob(jobDetails) {
-  try {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-    const prompt = `Analyze this job posting for potential spam indicators. Consider:
-    1. Unrealistic salary promises
-    2. Vague job descriptions
-    3. Suspicious requirements
-    4. Poor grammar or unprofessional language
-    5. Requests for personal/financial information
-    
-    Job details: ${JSON.stringify(jobDetails)}
-    
-    Return only "true" if likely spam or "false" if likely legitimate.`;
-    
-    const result = await model.generateContent(prompt);
-    return result.response.text().trim().toLowerCase() === 'true';
-  } catch (error) {
-    console.error('Error detecting spam:', error);
-    return false;
-  }
-}
-*/
 // Middleware setup
 app.use(cors({
   origin: process.env.CLIENT_URL || 'https://job-ui-six.vercel.app',
@@ -143,14 +43,21 @@ const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
-  if (!token) return res.sendStatus(401);
+  if (!token) {
+    return res.status(401).json({ error: 'No token provided' });
+  }
 
   jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key', (err, user) => {
-    if (err) return res.sendStatus(403);
+    if (err) {
+      if (err.name === 'TokenExpiredError') {
+        return res.status(401).json({ error: 'Token expired' });
+      }
+      return res.status(403).json({ error: 'Invalid token' });
+    }
     req.user = user;
     next();
   });
-};
+}; 
 
 
 // Helper function to scrape career page content
