@@ -6,11 +6,14 @@ const session = require('express-session');
 const FileStore = require('session-file-store')(session);
 const puppeteer = require('puppeteer');
 const cheerio = require('cheerio');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 require('dotenv').config();
 
 const app = express();
 const port = process.env.PORT || 3001;
-  
+
+// Initialize Google Gemini API
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY);
 
 // Middleware setup
 app.use(cors({
@@ -58,7 +61,6 @@ const authenticateToken = (req, res, next) => {
     next();
   });
 }; 
-
 
 // Helper function to scrape career page content
 const scrapeCareerPage = async (url) => {
@@ -160,7 +162,7 @@ const updateGithubJobs = async (jobs) => {
     throw error;
   }
 };
- 
+
 // Add the proxy endpoint for career pages
 app.get('/api/proxy-career-page', authenticateToken, async (req, res) => {
   try {
@@ -390,7 +392,6 @@ app.get('/api/public/jobs', async (req, res) => {
   }
 });
 
-
 // Get all jobs endpoint
 app.get('/api/jobs', authenticateToken, async (req, res) => {
   try {
@@ -427,6 +428,73 @@ app.get('/api/jobs/:id', async (req, res) => {
   }
 });
 
+// Add new endpoint for resume generation using Google Gemini API
+app.post('/api/generate-resume', authenticateToken, async (req, res) => {
+  try {
+    const {
+      fullName,
+      email,
+      phone,
+      location,
+      summary,
+      education,
+      experience,
+      skills,
+      projects,
+      certifications,
+      languages,
+      interests
+    } = req.body;
+
+    // Format the data for the prompt
+    const educationText = education.map(edu => 
+      `${edu.school} - ${edu.degree} in ${edu.field} (${edu.graduationYear})`
+    ).join('\n');
+    
+    const experienceText = experience.map(exp => 
+      `${exp.position} at ${exp.company} (${exp.startDate} - ${exp.endDate})\n${exp.description}`
+    ).join('\n\n');
+
+    const prompt = `Create a professional resume for the following person:
+    
+Name: ${fullName}
+Email: ${email}
+Phone: ${phone}
+Location: ${location}
+Summary: ${summary}
+
+Education:
+${educationText}
+
+Experience:
+${experienceText}
+
+Projects: ${projects}
+Skills: ${skills}
+Certifications: ${certifications}
+Languages: ${languages}
+Interests: ${interests}
+
+Please format this as a professional resume with appropriate sections and formatting. Make it concise, well-structured, and highlight the most important achievements and skills.`;
+
+    // Get the Gemini model
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+
+    // Generate content
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const generatedResume = response.text();
+
+    res.json({ resume: generatedResume });
+  } catch (error) {
+    console.error('Error generating resume:', error);
+    res.status(500).json({ 
+      error: 'Failed to generate resume',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'OK' });
@@ -452,4 +520,4 @@ app.use(limiter);
  
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
-});
+}); 
