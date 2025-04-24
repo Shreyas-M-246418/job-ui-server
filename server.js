@@ -431,6 +431,13 @@ app.get('/api/jobs/:id', async (req, res) => {
 // Add new endpoint for resume generation using Google Gemini API
 app.post('/api/generate-resume', authenticateToken, async (req, res) => {
   try {
+    console.log('Received resume generation request:', req.body);
+    
+    // Validate required fields
+    if (!req.body.fullName || !req.body.email) {
+      return res.status(400).json({ error: 'Name and email are required fields' });
+    }
+    
     const {
       fullName,
       email,
@@ -447,21 +454,25 @@ app.post('/api/generate-resume', authenticateToken, async (req, res) => {
     } = req.body;
 
     // Format the data for the prompt
-    const educationText = education.map(edu => 
-      `${edu.school} - ${edu.degree} in ${edu.field} (${edu.graduationYear})`
-    ).join('\n');
+    const educationText = education && education.length > 0 
+      ? education.map(edu => 
+          `${edu.school || ''} - ${edu.degree || ''} in ${edu.field || ''} (${edu.graduationYear || ''})`
+        ).join('\n')
+      : 'No education information provided';
     
-    const experienceText = experience.map(exp => 
-      `${exp.position} at ${exp.company} (${exp.startDate} - ${exp.endDate})\n${exp.description}`
-    ).join('\n\n');
+    const experienceText = experience && experience.length > 0
+      ? experience.map(exp => 
+          `${exp.position || ''} at ${exp.company || ''} (${exp.startDate || ''} - ${exp.endDate || ''})\n${exp.description || ''}`
+        ).join('\n\n')
+      : 'No experience information provided';
 
     const prompt = `Create a professional resume for the following person:
     
 Name: ${fullName}
 Email: ${email}
-Phone: ${phone}
-Location: ${location}
-Summary: ${summary}
+Phone: ${phone || 'Not provided'}
+Location: ${location || 'Not provided'}
+Summary: ${summary || 'Not provided'}
 
 Education:
 ${educationText}
@@ -469,14 +480,16 @@ ${educationText}
 Experience:
 ${experienceText}
 
-Projects: ${projects}
-Skills: ${skills}
-Certifications: ${certifications}
-Languages: ${languages}
-Interests: ${interests}
+Projects: ${projects || 'Not provided'}
+Skills: ${skills || 'Not provided'}
+Certifications: ${certifications || 'Not provided'}
+Languages: ${languages || 'Not provided'}
+Interests: ${interests || 'Not provided'}
 
 Please format this as a professional resume with appropriate sections and formatting. Make it concise, well-structured, and highlight the most important achievements and skills.`;
 
+    console.log('Sending prompt to Gemini API');
+    
     // Get the Gemini model
     const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
@@ -484,13 +497,25 @@ Please format this as a professional resume with appropriate sections and format
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const generatedResume = response.text();
+    
+    console.log('Resume generated successfully');
 
     res.json({ resume: generatedResume });
   } catch (error) {
     console.error('Error generating resume:', error);
+    
+    // Provide more detailed error information
+    let errorMessage = 'Failed to generate resume';
+    let errorDetails = error.message;
+    
+    if (error.response) {
+      errorMessage = 'API error';
+      errorDetails = error.response.data?.error || error.response.statusText || error.message;
+    }
+    
     res.status(500).json({ 
-      error: 'Failed to generate resume',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? errorDetails : undefined
     });
   }
 });
