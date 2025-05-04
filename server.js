@@ -60,7 +60,7 @@ const authenticateToken = (req, res, next) => {
     req.user = user;
     next();
   });
-}; 
+};
 
 // Helper function to scrape career page content
 const scrapeCareerPage = async (url) => {
@@ -73,14 +73,12 @@ const scrapeCareerPage = async (url) => {
     const page = await browser.newPage();
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
     
-    // Set a reasonable timeout
     await page.goto(url, { 
       waitUntil: 'networkidle0', 
       timeout: 30000 
     });
     
     const content = await page.evaluate(() => {
-      // Remove scripts, styles, and other non-content elements
       const scripts = document.getElementsByTagName('script');
       const styles = document.getElementsByTagName('style');
       Array.from(scripts).forEach(script => script.remove());
@@ -195,10 +193,8 @@ app.get('/api/proxy-career-page', authenticateToken, async (req, res) => {
 
     const $ = cheerio.load(response.data);
 
-    // Remove unwanted elements
     $('script, style, nav, header, footer, iframe, noscript, img, svg, button').remove();
 
-    // Extract text from main content areas
     let content = '';
     const selectors = [
       'main',
@@ -221,12 +217,10 @@ app.get('/api/proxy-career-page', authenticateToken, async (req, res) => {
       }
     }
 
-    // If no content found from specific selectors, get body text
     if (!content || content.length < 100) {
       content = $('body').text().trim();
     }
 
-    // Clean the text
     const cleanedText = content
       .replace(/\s+/g, ' ')
       .replace(/\n+/g, ' ')
@@ -318,11 +312,10 @@ app.post('/api/jobs', authenticateToken, async (req, res) => {
       careerLink,
       userId,
       createdBy,
-      companySummary, // Now received from client
-      isSpam // Now received from client
+      companySummary,
+      isSpam
     } = req.body;
     
-    // Validate URLs if provided
     if (applyLink) {
       try {
         new URL(applyLink);
@@ -399,7 +392,6 @@ app.get('/api/jobs', authenticateToken, async (req, res) => {
     const userId = req.query.userId;
 
     if (userId) {
-      // Convert both IDs to strings for comparison
       const userJobs = jobs.filter(job => String(job.userId) === String(userId));
       res.json(userJobs);
     } else {
@@ -428,8 +420,8 @@ app.get('/api/jobs/:id', async (req, res) => {
   }
 });
 
-// Add new endpoint for resume generation using Google Gemini API
-app.post('/api/generate-resume', authenticateToken, async (req, res) => {
+// Resume generation endpoint (no auth required)
+app.post('/api/generate-resume', async (req, res) => {
   try {
     console.log('Received resume generation request:', req.body);
     
@@ -545,4 +537,4 @@ app.use(limiter);
  
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
-}); 
+});
