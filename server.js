@@ -429,7 +429,7 @@ app.get('/api/jobs/:id', async (req, res) => {
   }
 });
 
-// Resume generation endpoint (no auth required)
+
 app.post('/api/generate-resume', async (req, res) => {
   try {
     console.log('Received resume generation request:', req.body);
@@ -467,8 +467,8 @@ app.post('/api/generate-resume', async (req, res) => {
         ).join('\n\n')
       : 'No experience information provided';
 
-    const prompt = `Create a professional resume for the following person:
-    
+    const prompt = `Create a professional resume in HTML format for the following person. The resume should be well-structured and ready to be converted to PDF. Use appropriate HTML tags for formatting:
+
 Name: ${fullName}
 Email: ${email}
 Phone: ${phone || 'Not provided'}
@@ -487,7 +487,27 @@ Certifications: ${certifications || 'Not provided'}
 Languages: ${languages || 'Not provided'}
 Interests: ${interests || 'Not provided'}
 
-Please format this as a professional resume with appropriate sections and formatting. Make it concise, well-structured, and highlight the most important achievements and skills.`;
+Please format this as a professional resume with the following structure:
+1. Header with name, contact info, and location
+2. Professional summary
+3. Education section
+4. Experience section (if any)
+5. Projects section
+6. Skills section
+7. Certifications section
+8. Languages section
+9. Interests section
+
+Use appropriate HTML tags for formatting, including:
+- <h1> for name
+- <h2> for section headers
+- <p> for paragraphs
+- <ul> and <li> for lists
+- <strong> for emphasis
+- <div> for sections
+- <span> for inline styling
+
+Include CSS styling inline to ensure proper formatting when converted to PDF.`;
 
     console.log('Sending prompt to Gemini API');
     
@@ -536,7 +556,71 @@ Please format this as a professional resume with appropriate sections and format
     
     console.log('Resume generated successfully');
 
-    res.json({ resume: generatedResume });
+    // Add base HTML structure and styling
+    const styledResume = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body {
+          font-family: 'Arial', sans-serif;
+          line-height: 1.6;
+          margin: 0;
+          padding: 20px;
+          color: #333;
+        }
+        .resume-container {
+          max-width: 800px;
+          margin: 0 auto;
+          padding: 20px;
+          background-color: white;
+        }
+        h1 {
+          color: #2c3e50;
+          border-bottom: 2px solid #2c3e50;
+          padding-bottom: 10px;
+          margin-bottom: 20px;
+        }
+        h2 {
+          color: #2c3e50;
+          margin-top: 20px;
+          margin-bottom: 10px;
+        }
+        .contact-info {
+          margin-bottom: 20px;
+        }
+        .section {
+          margin-bottom: 20px;
+        }
+        ul {
+          padding-left: 20px;
+        }
+        li {
+          margin-bottom: 5px;
+        }
+        .summary {
+          font-style: italic;
+          margin-bottom: 20px;
+        }
+        @media print {
+          body {
+            padding: 0;
+          }
+          .resume-container {
+            padding: 0;
+          }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="resume-container">
+        ${generatedResume}
+      </div>
+    </body>
+    </html>`;
+
+    res.json({ resume: styledResume });
   } catch (error) {
     console.error('Error generating resume:', error);
     
@@ -555,6 +639,7 @@ Please format this as a professional resume with appropriate sections and format
     });
   }
 });
+
 
 // Health check endpoint
 app.get('/health', (req, res) => {
