@@ -7,6 +7,7 @@ const FileStore = require('session-file-store')(session);
 const puppeteer = require('puppeteer');
 const cheerio = require('cheerio');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const app = express();
@@ -26,6 +27,14 @@ app.use(cors({
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100 // limit each IP to 100 requests per windowMs
+});
+
+app.use(limiter);
 
 app.use(session({ 
   store: new FileStore({
@@ -482,11 +491,46 @@ Please format this as a professional resume with appropriate sections and format
 
     console.log('Sending prompt to Gemini API');
     
-    // Get the Gemini model
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    // Get the Gemini model with correct configuration
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-1.5-pro",
+      generationConfig: {
+        temperature: 0.7,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 2048,
+      }
+    });
 
-    // Generate content
-    const result = await model.generateContent(prompt);
+    // Generate content with safety settings
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: 0.7,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 2048,
+      },
+      safetySettings: [
+        {
+          category: "HARM_CATEGORY_HARASSMENT",
+          threshold: "BLOCK_MEDIUM_AND_ABOVE"
+        },
+        {
+          category: "HARM_CATEGORY_HATE_SPEECH",
+          threshold: "BLOCK_MEDIUM_AND_ABOVE"
+        },
+        {
+          category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+          threshold: "BLOCK_MEDIUM_AND_ABOVE"
+        },
+        {
+          category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+          threshold: "BLOCK_MEDIUM_AND_ABOVE"
+        }
+      ]
+    });
+
     const response = await result.response;
     const generatedResume = response.text();
     
@@ -526,15 +570,6 @@ app.use((err, req, res, next) => {
   });
 });
 
-const rateLimit = require('express-rate-limit');
-
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
-});
-
-app.use(limiter);
- 
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
